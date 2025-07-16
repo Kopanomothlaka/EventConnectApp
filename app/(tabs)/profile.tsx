@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Share, TextInput, Modal, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { User as UserIcon, Settings, Calendar, Users, Award, Bell, Share2, CreditCard as Edit3, Building, Mail, Linkedin, MessageCircle, Twitter, Instagram, Globe, Plus, X, Save, Check } from 'lucide-react-native';
@@ -8,8 +8,9 @@ import LogoutButton from '@/components/LogoutButton';
 import { useAuth } from '../../contexts/AuthContext';
 import { DatabaseService } from '../../services/database';
 import { router } from 'expo-router';
-import type { Event, User } from '@/types';
+import type { Event, User, Contact } from '@/types';
 import { useFocusEffect } from 'expo-router';
+import ContactCard from '@/components/ContactCard';
 
 interface SocialMediaAccount {
   id: string;
@@ -43,6 +44,9 @@ export default function ProfileScreen() {
   const [attendeesLoading, setAttendeesLoading] = useState(false);
   const [selectedEventTitle, setSelectedEventTitle] = useState('');
   const [registeredEvents, setRegisteredEvents] = useState<Event[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [mutualConnections, setMutualConnections] = useState<{ [contactId: string]: boolean }>({});
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
 
   // Redirect to login if logged out
   useEffect(() => {
@@ -61,6 +65,8 @@ export default function ProfileScreen() {
   useEffect(() => {
     if (user) {
       loadUserProfile();
+      loadSocialAccounts();
+      loadContacts();
     }
   }, [user]);
 
@@ -160,6 +166,46 @@ export default function ProfileScreen() {
     }, [user, profileData.role])
   );
 
+  const loadSocialAccounts = async () => {
+    if (!user?.id) return;
+    try {
+      const socialAccountsData = await DatabaseService.getUserSocialAccounts(user.id);
+      setSocialAccounts(socialAccountsData.map(account => ({
+        id: account.id,
+        platform: account.platform,
+        username: account.username,
+        url: account.url,
+        icon: getSocialIcon(account.platform),
+      })));
+    } catch (error) {
+      setSocialAccounts([]);
+    }
+  };
+
+  const loadContacts = async () => {
+    if (!user?.id) return;
+    try {
+      const users = await DatabaseService.getContacts(user.id);
+      const contactsList = users.map(u => ({
+        ...u,
+        metAt: 'EventConnect',
+        dateAdded: u.created_at ? u.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10),
+      }));
+      setContacts(contactsList);
+      // Check mutual connections
+      const mutuals: { [contactId: string]: boolean } = {};
+      await Promise.all(
+        contactsList.map(async (c) => {
+          mutuals[c.id] = await DatabaseService.isMutualConnection(user.id, c.id);
+        })
+      );
+      setMutualConnections(mutuals);
+    } catch (error) {
+      setContacts([]);
+      setMutualConnections({});
+    }
+  };
+
   const getSocialIcon = (platform: string) => {
     switch (platform.toLowerCase()) {
       case 'linkedin': return Linkedin;
@@ -243,6 +289,12 @@ export default function ProfileScreen() {
     }
   };
 
+  // Handler for opening contact modal
+  const handleContactCardPress = useCallback((contact: Contact) => {
+    router.push(`/user/${contact.id}`); // Expo Router will resolve this to /(tabs)/user/[id]
+  }, []);
+
+  // Handler for email/linkedin/whatsapp actions
   const handleContactPress = async (type: 'email' | 'linkedin' | 'whatsapp') => {
     try {
       switch (type) {
@@ -288,28 +340,20 @@ export default function ProfileScreen() {
     }
 
     try {
-      // const accountId = await DatabaseService.addSocialAccount({
-      //   user_id: user.id,
-      //   platform: newSocialPlatform,
-      //   username: newSocialUsername,
-      //   url: `https://${newSocialPlatform.toLowerCase()}.com/${newSocialUsername}`,
-      // });
-
-      // if (accountId) {
-        const newAccount: SocialMediaAccount = {
-          id: 'temp_id', // Placeholder ID, will be replaced by actual DB insertion
-          platform: newSocialPlatform,
-          username: newSocialUsername,
-          url: `https://${newSocialPlatform.toLowerCase()}.com/${newSocialUsername}`,
-          icon: getSocialIcon(newSocialPlatform),
-        };
-
-        setSocialAccounts(prev => [...prev, newAccount]);
+      const url = `https://${newSocialPlatform.toLowerCase()}.com/${newSocialUsername}`;
+      const accountId = await DatabaseService.addSocialAccount({
+        user_id: user.id,
+        platform: newSocialPlatform,
+        username: newSocialUsername,
+        url,
+      });
+      if (accountId) {
+        await loadSocialAccounts();
         setNewSocialPlatform('');
         setNewSocialUsername('');
         setShowAddSocial(false);
         Alert.alert('Success', 'Social media account added successfully!');
-      // }
+      }
     } catch (error) {
       console.error('Error adding social account:', error);
       Alert.alert('Error', 'Failed to add social media account');
@@ -318,11 +362,11 @@ export default function ProfileScreen() {
 
   const removeSocialAccount = async (id: string) => {
     try {
-      // const success = await DatabaseService.removeSocialAccount(id);
-      // if (success) {
-        setSocialAccounts(prev => prev.filter(account => account.id !== id));
+      const success = await DatabaseService.removeSocialAccount(id);
+      if (success) {
+        await loadSocialAccounts();
         Alert.alert('Success', 'Social media account removed successfully!');
-      // }
+      }
     } catch (error) {
       console.error('Error removing social account:', error);
       Alert.alert('Error', 'Failed to remove social media account');
@@ -547,6 +591,22 @@ export default function ProfileScreen() {
                 </View>
               ))}
             </View>
+          </View>
+          {/* Contacts Section */}
+          <View style={styles.contactsSection}>
+            <Text style={styles.sectionTitle}>Contacts ({contacts.length})</Text>
+            {contacts.length === 0 ? (
+              <Text style={styles.emptyStateText}>No contacts yet. Start networking by scanning QR codes!</Text>
+            ) : (
+              contacts.map(contact => (
+                <ContactCard
+                  key={contact.id}
+                  contact={contact}
+                  onPress={() => handleContactCardPress(contact)}
+                  isMutual={!!mutualConnections[contact.id]}
+                />
+              ))
+            )}
           </View>
         </View>
 
@@ -1181,5 +1241,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 8,
+  },
+  contactsSection: {
+    marginTop: Spacing.lg,
+    padding: Spacing.lg,
   },
 });

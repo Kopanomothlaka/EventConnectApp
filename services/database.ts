@@ -276,4 +276,59 @@ export class DatabaseService {
     }
     return (data || []).map((row: any) => row.users);
   }
+
+  static async isMutualConnection(userId: string, contactId: string): Promise<boolean> {
+    // Check if userId has contactId and contactId has userId
+    const { data: a, error: errorA } = await supabase
+      .from('contacts')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('contact_id', contactId)
+      .single();
+    const { data: b, error: errorB } = await supabase
+      .from('contacts')
+      .select('id')
+      .eq('user_id', contactId)
+      .eq('contact_id', userId)
+      .single();
+    return !!a && !!b;
+  }
+
+  // Social account operations
+  static async addSocialAccount({ user_id, platform, username, url }: { user_id: string, platform: string, username: string, url: string }): Promise<string | null> {
+    const { data, error } = await supabase
+      .from('social_accounts')
+      .insert([{ user_id, platform, username, url }])
+      .select('id')
+      .single();
+    if (error) {
+      console.error('Error adding social account:', error);
+      return null;
+    }
+    return data.id;
+  }
+
+  static async getUserSocialAccounts(userId: string): Promise<SocialAccount[]> {
+    const { data, error } = await supabase
+      .from('social_accounts')
+      .select('*')
+      .eq('user_id', userId);
+    if (error) {
+      console.error('Error fetching social accounts:', error);
+      return [];
+    }
+    return data || [];
+  }
+
+  static async removeSocialAccount(id: string): Promise<boolean> {
+    const { error } = await supabase
+      .from('social_accounts')
+      .delete()
+      .eq('id', id);
+    if (error) {
+      console.error('Error removing social account:', error);
+      return false;
+    }
+    return true;
+  }
 }

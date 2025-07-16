@@ -7,9 +7,10 @@ import { Colors, Spacing, BorderRadius, Typography } from '@/constants/Colors';
 interface ContactCardProps {
   contact: Contact;
   onPress: () => void;
+  isMutual?: boolean;
 }
 
-export default function ContactCard({ contact, onPress }: ContactCardProps) {
+export default function ContactCard({ contact, onPress, isMutual }: ContactCardProps) {
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('en-US', {
       month: 'short',
@@ -40,6 +41,11 @@ export default function ContactCard({ contact, onPress }: ContactCardProps) {
           <Text style={styles.email} numberOfLines={1}>
             {contact.email}
           </Text>
+          {isMutual && (
+            <View style={styles.connectedBadge}>
+              <Text style={styles.connectedBadgeText}>Connected</Text>
+            </View>
+          )}
         </View>
         <View style={styles.socialIcons}>
           {contact.linkedIn && (
@@ -185,5 +191,19 @@ const styles = StyleSheet.create({
     ...Typography.bodySmall,
     color: Colors.textSecondary,
     fontStyle: 'italic',
+  },
+  connectedBadge: {
+    backgroundColor: '#22c55e', // green
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  connectedBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 });
