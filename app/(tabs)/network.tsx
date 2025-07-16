@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { QrCode, Search, UserPlus, Users, Scan } from 'lucide-react-native';
@@ -11,7 +11,9 @@ import { useAuth } from '../../contexts/AuthContext';
 // @ts-ignore
 import QRCode from 'react-native-qrcode-svg';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
+import { v4 as uuidv4 } from 'uuid';
+import { DatabaseService } from '@/services/database';
 
 export default function NetworkScreen() {
   const { user } = useAuth();
@@ -22,8 +24,22 @@ export default function NetworkScreen() {
   const [scanning, setScanning] = useState(false);
   const [scanned, setScanned] = useState(false);
   const cameraRef = useRef(null);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const alertShownRef = useRef(false);
 
-  const filteredContacts = mockContacts.filter(contact =>
+  useEffect(() => {
+    if (user?.id) {
+      DatabaseService.getContacts(user.id).then(users => {
+        setContacts(users.map(u => ({
+          ...u,
+          metAt: 'EventConnect',
+          dateAdded: u.created_at ? u.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10),
+        })));
+      });
+    }
+  }, [user]);
+
+  const filteredContacts = contacts.filter(contact =>
     contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     contact.company?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     contact.email.toLowerCase().includes(searchQuery.toLowerCase())
@@ -36,16 +52,52 @@ export default function NetworkScreen() {
   const handleScanQR = () => {
     setScanning(true);
     setScanned(false);
+    alertShownRef.current = false;
   };
 
   const handleCloseScanner = () => {
     setScanning(false);
   };
 
-  const handleBarCodeScanned = ({ data }: { data: string }) => {
+  const handleBarCodeScanned = async ({ data }: { data: string }) => {
+    if (scanned || alertShownRef.current) return; // Prevent multiple scans/alerts
     setScanned(true);
     setScanning(false);
-    Alert.alert('QR Code Scanned', data);
+    alertShownRef.current = true;
+    try {
+      const parsed = JSON.parse(data);
+      if (!parsed.id || !parsed.name || !parsed.email) {
+        throw new Error('Missing required contact fields');
+      }
+      if (contacts.some(c => c.email === parsed.email)) {
+        setTimeout(() => {
+          Alert.alert('Contact already exists', `${parsed.name} is already in your contacts.`);
+        }, 100);
+        return;
+      }
+      if (user?.id) {
+        const success = await DatabaseService.addContactConnection(user.id, parsed.id);
+        if (success) {
+          const updatedContacts = await DatabaseService.getContacts(user.id);
+          setContacts(updatedContacts.map(u => ({
+            ...u,
+            metAt: 'EventConnect',
+            dateAdded: u.created_at ? u.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10),
+          })));
+          setTimeout(() => {
+            Alert.alert('Contact Added', `${parsed.name} has been added to your contacts.`);
+          }, 100);
+        } else {
+          setTimeout(() => {
+            Alert.alert('Error', 'Failed to add contact connection.');
+          }, 100);
+        }
+      }
+    } catch (e) {
+      setTimeout(() => {
+        Alert.alert('Invalid QR Code', 'The scanned QR code is not a valid contact.');
+      }, 100);
+    }
   };
 
   const handleGenerateQR = () => {

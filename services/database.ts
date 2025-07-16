@@ -252,4 +252,28 @@ export class DatabaseService {
 
     return data || [];
   }
+
+  // Contact operations
+  static async addContactConnection(userId: string, contactId: string): Promise<boolean> {
+    const { error } = await supabase
+      .from('contacts')
+      .insert([{ user_id: userId, contact_id: contactId }]);
+    if (error && error.code !== '23505') { // 23505 = unique violation
+      console.error('Error adding contact connection:', error);
+      return false;
+    }
+    return true;
+  }
+
+  static async getContacts(userId: string): Promise<User[]> {
+    const { data, error } = await supabase
+      .from('contacts')
+      .select('contact_id, users:contact_id(*)')
+      .eq('user_id', userId);
+    if (error) {
+      console.error('Error fetching contacts:', error);
+      return [];
+    }
+    return (data || []).map((row: any) => row.users);
+  }
 }
