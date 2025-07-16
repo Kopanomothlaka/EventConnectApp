@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Share, TextInput, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Share, TextInput, Modal, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { User, Settings, Calendar, Users, Award, Bell, Share2, CreditCard as Edit3, Building, Mail, Linkedin, MessageCircle, Twitter, Instagram, Globe, Plus, X, Save, Check } from 'lucide-react-native';
+import { User as UserIcon, Settings, Calendar, Users, Award, Bell, Share2, CreditCard as Edit3, Building, Mail, Linkedin, MessageCircle, Twitter, Instagram, Globe, Plus, X, Save, Check } from 'lucide-react-native';
 import { mockUser, mockEvents } from '@/data/mockData';
 import { Colors, Spacing, BorderRadius, Typography } from '@/constants/Colors';
 import LogoutButton from '@/components/LogoutButton';
 import { useAuth } from '../../contexts/AuthContext';
 import { DatabaseService } from '../../services/database';
+import { router } from 'expo-router';
+import type { Event, User } from '@/types';
+import { useFocusEffect } from 'expo-router';
 
 interface SocialMediaAccount {
   id: string;
@@ -34,6 +37,25 @@ export default function ProfileScreen() {
   const [newSocialUsername, setNewSocialUsername] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [socialAccounts, setSocialAccounts] = useState<SocialMediaAccount[]>([]);
+  const [organizedEvents, setOrganizedEvents] = useState<Event[]>([]);
+  const [showAttendeesModal, setShowAttendeesModal] = useState(false);
+  const [attendees, setAttendees] = useState<User[]>([]);
+  const [attendeesLoading, setAttendeesLoading] = useState(false);
+  const [selectedEventTitle, setSelectedEventTitle] = useState('');
+  const [registeredEvents, setRegisteredEvents] = useState<Event[]>([]);
+
+  // Redirect to login if logged out
+  useEffect(() => {
+    console.log('Session changed:', session);
+    if (!session) {
+      try {
+        router.replace('/auth/login');
+        router.push('/auth/login');
+      } catch (e) {
+        console.error('Navigation error after logout:', e);
+      }
+    }
+  }, [session]);
 
   // Load user profile data
   useEffect(() => {
@@ -60,19 +82,83 @@ export default function ProfileScreen() {
         });
 
         // Load social accounts
-        const socialAccountsData = await DatabaseService.getUserSocialAccounts(user.id);
-        setSocialAccounts(socialAccountsData.map(account => ({
-          id: account.id,
-          platform: account.platform,
-          username: account.username,
-          url: account.url,
-          icon: getSocialIcon(account.platform),
-        })));
+        // const socialAccountsData = await DatabaseService.getUserSocialAccounts(user.id);
+        // setSocialAccounts(socialAccountsData.map(account => ({
+        //   id: account.id,
+        //   platform: account.platform,
+        //   username: account.username,
+        //   url: account.url,
+        //   icon: getSocialIcon(account.platform),
+        // })));
       }
     } catch (error) {
       console.error('Error loading user profile:', error);
     }
   };
+
+  const loadOrganizerEvents = async () => {
+    if (!user?.id) return;
+    try {
+      const eventsRaw = await DatabaseService.getOrganizerEvents(user.id);
+      // Map raw events to Event type expected by UI
+      const events: Event[] = eventsRaw.map(e => ({
+        ...e,
+        organizer: {
+          id: user.id,
+          name: profileData.name,
+          email: profileData.email,
+          role: profileData.role,
+          company: profileData.company,
+          position: profileData.position,
+          bio: profileData.bio,
+          linkedIn: profileData.linkedin,
+          whatsApp: profileData.whatsapp,
+        },
+        speakers: [],
+        agenda: [],
+        attendees: [],
+        maxAttendees: e.max_attendees,
+        isRegistered: false,
+        category: e.category as 'conference' | 'workshop' | 'networking' | 'seminar',
+        status: e.status as 'upcoming' | 'ongoing' | 'completed',
+      }));
+      setOrganizedEvents(events);
+    } catch (error) {
+      setOrganizedEvents([]);
+    }
+  };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user && profileData.role === 'organizer') {
+        loadOrganizerEvents();
+      }
+      if (user && profileData.role === 'attendee') {
+        // Refetch registered events for attendee
+        const fetchRegisteredEvents = async () => {
+          const eventsRaw = await DatabaseService.getUserEvents(user.id);
+          const events = eventsRaw.map(e => ({
+            ...e,
+            organizer: {
+              id: e.organizer_id,
+              name: '',
+              email: '',
+              role: 'organizer' as 'organizer',
+            },
+            speakers: [],
+            agenda: [],
+            attendees: [],
+            maxAttendees: e.max_attendees,
+            isRegistered: true,
+            category: e.category as 'conference' | 'workshop' | 'networking' | 'seminar',
+            status: (e.status as 'upcoming' | 'ongoing' | 'completed'),
+          }));
+          setRegisteredEvents(events);
+        };
+        fetchRegisteredEvents();
+      }
+    }, [user, profileData.role])
+  );
 
   const getSocialIcon = (platform: string) => {
     switch (platform.toLowerCase()) {
@@ -202,16 +288,16 @@ export default function ProfileScreen() {
     }
 
     try {
-      const accountId = await DatabaseService.addSocialAccount({
-        user_id: user.id,
-        platform: newSocialPlatform,
-        username: newSocialUsername,
-        url: `https://${newSocialPlatform.toLowerCase()}.com/${newSocialUsername}`,
-      });
+      // const accountId = await DatabaseService.addSocialAccount({
+      //   user_id: user.id,
+      //   platform: newSocialPlatform,
+      //   username: newSocialUsername,
+      //   url: `https://${newSocialPlatform.toLowerCase()}.com/${newSocialUsername}`,
+      // });
 
-      if (accountId) {
+      // if (accountId) {
         const newAccount: SocialMediaAccount = {
-          id: accountId,
+          id: 'temp_id', // Placeholder ID, will be replaced by actual DB insertion
           platform: newSocialPlatform,
           username: newSocialUsername,
           url: `https://${newSocialPlatform.toLowerCase()}.com/${newSocialUsername}`,
@@ -223,7 +309,7 @@ export default function ProfileScreen() {
         setNewSocialUsername('');
         setShowAddSocial(false);
         Alert.alert('Success', 'Social media account added successfully!');
-      }
+      // }
     } catch (error) {
       console.error('Error adding social account:', error);
       Alert.alert('Error', 'Failed to add social media account');
@@ -232,11 +318,11 @@ export default function ProfileScreen() {
 
   const removeSocialAccount = async (id: string) => {
     try {
-      const success = await DatabaseService.removeSocialAccount(id);
-      if (success) {
+      // const success = await DatabaseService.removeSocialAccount(id);
+      // if (success) {
         setSocialAccounts(prev => prev.filter(account => account.id !== id));
         Alert.alert('Success', 'Social media account removed successfully!');
-      }
+      // }
     } catch (error) {
       console.error('Error removing social account:', error);
       Alert.alert('Error', 'Failed to remove social media account');
@@ -277,10 +363,34 @@ export default function ProfileScreen() {
     event.organizer.id === user?.id || event.attendees.some(attendee => attendee.id === user?.id)
   );
 
-  const organizedEvents = mockEvents.filter(event => event.organizer.id === user?.id);
-  const registeredEvents = mockEvents.filter(event => 
-    event.attendees.some(attendee => attendee.id === user?.id)
-  );
+  const handleDeleteEvent = async (eventId: string) => {
+    Alert.alert('Delete Event', 'Are you sure you want to delete this event?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        const success = await DatabaseService.deleteEvent(eventId);
+        if (success) {
+          setOrganizedEvents(prev => prev.filter(e => e.id !== eventId));
+          Alert.alert('Success', 'Event deleted successfully');
+        } else {
+          Alert.alert('Error', 'Failed to delete event');
+        }
+      }}
+    ]);
+  };
+
+  const handleViewAttendees = async (eventId: string, eventTitle: string) => {
+    setAttendeesLoading(true);
+    setShowAttendeesModal(true);
+    setSelectedEventTitle(eventTitle);
+    try {
+      const data = await DatabaseService.getEventAttendees(eventId);
+      setAttendees(data);
+    } catch (e) {
+      setAttendees([]);
+    } finally {
+      setAttendeesLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -383,7 +493,7 @@ export default function ProfileScreen() {
                   />
                 </View>
                 <View style={styles.detailRow}>
-                  <User size={16} color={Colors.textSecondary} />
+                  <UserIcon size={16} color={Colors.textSecondary} />
                   <TextInput
                     style={styles.editDetailInput}
                     value={profileData.position}
@@ -419,7 +529,7 @@ export default function ProfileScreen() {
             </View>
 
             <View style={styles.socialAccounts}>
-              {socialAccounts.map(account => (
+              {socialAccounts.map((account: SocialMediaAccount) => (
                 <View key={account.id} style={styles.socialAccount}>
                   <TouchableOpacity 
                     style={styles.socialButton} 
@@ -442,21 +552,27 @@ export default function ProfileScreen() {
 
         {/* Stats Section */}
         <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Calendar size={24} color={Colors.primary} />
-            <Text style={styles.statNumber}>{userEvents.length}</Text>
-            <Text style={styles.statLabel}>Total Events</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Users size={24} color={Colors.secondary} />
-            <Text style={styles.statNumber}>{organizedEvents.length}</Text>
-            <Text style={styles.statLabel}>Organized</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Award size={24} color={Colors.accent} />
-            <Text style={styles.statNumber}>{registeredEvents.length}</Text>
-            <Text style={styles.statLabel}>Attended</Text>
-          </View>
+          {profileData.role === 'attendee' && (
+            <View style={styles.statCard}>
+              <Award size={24} color={Colors.accent} />
+              <Text style={styles.statNumber}>{registeredEvents.length}</Text>
+              <Text style={styles.statLabel}>Events Registered</Text>
+            </View>
+          )}
+          {profileData.role === 'organizer' && (
+            <>
+              <View style={styles.statCard}>
+                <Calendar size={24} color={Colors.primary} />
+                <Text style={styles.statNumber}>{userEvents.length}</Text>
+                <Text style={styles.statLabel}>Total Events</Text>
+              </View>
+              <View style={styles.statCard}>
+                <UserIcon size={24} color={Colors.secondary} />
+                <Text style={styles.statNumber}>{organizedEvents.length}</Text>
+                <Text style={styles.statLabel}>Organized</Text>
+              </View>
+            </>
+          )}
         </View>
 
         {/* Menu Section */}
@@ -488,11 +604,49 @@ export default function ProfileScreen() {
                 size={20} 
                 color={Colors.error} 
                 showText={true}
+                
                 textStyle={{ color: Colors.error }}
               />
             </View>
           </View>
         </View>
+
+        {profileData.role === 'organizer' && (
+          <View style={styles.organizedEventsSection}>
+            <Text style={styles.sectionTitle}>Organized Events ({organizedEvents.length})</Text>
+            <TouchableOpacity
+              style={[styles.addButton, { marginBottom: 16 }]}
+              onPress={() => router.push('/organizer/create-event')}
+            >
+              <Text style={styles.addButtonText}>+ Create Event</Text>
+            </TouchableOpacity>
+            {organizedEvents.length === 0 ? (
+              <Text style={styles.emptyStateText}>No events organized yet.</Text>
+            ) : (
+              organizedEvents.map(event => (
+                <View key={event.id} style={styles.organizedEventCard}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.eventTitle}>{event.title}</Text>
+                    <Text style={styles.eventDate}>{event.date} at {event.time}</Text>
+                    <Text style={styles.eventVenue}>{event.venue}</Text>
+                  </View>
+                  <TouchableOpacity style={styles.editButton} onPress={() => router.push(`/organizer/edit-event?id=${encodeURIComponent(event.id)}` as any)}>
+                    <Edit3 size={18} color={Colors.primary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.deleteButton} onPress={async () => {
+                    await handleDeleteEvent(event.id);
+                    loadOrganizerEvents();
+                  }}>
+                    <X size={18} color={Colors.error} />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.attendeesButton} onPress={() => handleViewAttendees(event.id, event.title)}>
+                    <UserIcon size={18} color={Colors.secondary} />
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
+          </View>
+        )}
       </ScrollView>
 
       {/* Add Social Media Modal */}
@@ -561,6 +715,41 @@ export default function ProfileScreen() {
               >
                 <Text style={styles.addButtonText}>Add</Text>
               </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Attendees Modal */}
+      <Modal
+        visible={showAttendeesModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowAttendeesModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Registered Attendees for {selectedEventTitle}</Text>
+              <TouchableOpacity onPress={() => setShowAttendeesModal(false)}>
+                <X size={24} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.modalBody}>
+              {attendeesLoading ? (
+                <ActivityIndicator size="large" color={Colors.primary} />
+              ) : attendees.length === 0 ? (
+                <Text style={styles.emptyStateText}>No attendees registered yet.</Text>
+              ) : (
+                <ScrollView style={{ maxHeight: 300 }}>
+                  {attendees.map((a) => (
+                    <View key={a.id} style={{ paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.borderLight }}>
+                      <Text style={{ fontWeight: '600', color: Colors.text }}>{a.name}</Text>
+                      <Text style={{ color: Colors.textSecondary }}>{a.email}</Text>
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
             </View>
           </View>
         </View>
@@ -940,5 +1129,57 @@ const styles = StyleSheet.create({
     ...Typography.body,
     color: Colors.white,
     fontWeight: '600',
+  },
+  organizedEventsSection: {
+    marginTop: Spacing.lg,
+    padding: Spacing.lg,
+  },
+  sectionTitle: {
+    ...Typography.h2,
+    color: Colors.text,
+    marginBottom: Spacing.md,
+  },
+  emptyStateText: {
+    ...Typography.body,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+  },
+  organizedEventCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+  },
+  eventTitle: {
+    ...Typography.h3,
+    color: Colors.text,
+    marginBottom: Spacing.xs,
+  },
+  eventDate: {
+    ...Typography.bodySmall,
+    color: Colors.textSecondary,
+  },
+  eventVenue: {
+    ...Typography.bodySmall,
+    color: Colors.textSecondary,
+  },
+  deleteButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: Colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: Spacing.md,
+  },
+  attendeesButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
   },
 });

@@ -38,7 +38,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email);
+        console.log('Auth state changed:', event, session);
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
@@ -46,7 +46,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Handle logout event
         if (event === 'SIGNED_OUT') {
           console.log('User signed out, navigating to welcome screen');
-          router.replace('/');
+          // router.replace('/');
         }
       }
     );
@@ -100,6 +100,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('Signing out user...');
       const { error } = await supabase.auth.signOut();
+      // Only clear storage if running in a browser (web)
+      if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+        window.localStorage.clear();
+      }
+      if (typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined') {
+        window.sessionStorage.clear();
+      }
       if (error) {
         console.error('Error signing out:', error);
         throw error;

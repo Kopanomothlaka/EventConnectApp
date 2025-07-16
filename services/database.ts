@@ -8,6 +8,12 @@ type Speaker = Database['public']['Tables']['speakers']['Row'];
 type AgendaItem = Database['public']['Tables']['agenda_items']['Row'];
 type SocialAccount = Database['public']['Tables']['social_accounts']['Row'];
 
+// Utility to recursively flatten arrays
+function flattenArray(arr: any[]): any[] {
+  return arr.reduce((flat, toFlatten) =>
+    flat.concat(Array.isArray(toFlatten) ? flattenArray(toFlatten) : toFlatten), []);
+}
+
 export class DatabaseService {
   // User operations
   static async getUser(userId: string): Promise<User | null> {
@@ -45,7 +51,7 @@ export class DatabaseService {
       .from('events')
       .select(`
         *,
-        users!events_organizer_id_fkey(name, company)
+        users!events_organizer_id_fkey(*)
       `)
       .order('date', { ascending: true });
 
@@ -62,10 +68,10 @@ export class DatabaseService {
       .from('events')
       .select(`
         *,
-        users!events_organizer_id_fkey(name, company)
+        users!events_organizer_id_fkey(*)
       `)
       .eq('id', eventId)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('Error fetching event:', error);
@@ -190,17 +196,18 @@ export class DatabaseService {
       return [];
     }
 
-    return data?.map(item => item.users) || [];
+    const flatData = Array.isArray(data) ? flattenArray(data) : [];
+    return flatData
+      .filter(item => item && typeof item === 'object' && !Array.isArray(item) && item.users && typeof item.users === 'object')
+      .map(item => item.users)
+      .filter(u => u && u.id && u.email && u.name && u.role);
   }
 
   static async getUserEvents(userId: string): Promise<Event[]> {
     const { data, error } = await supabase
       .from('event_attendees')
       .select(`
-        events!event_attendees_event_id_fkey(
-          *,
-          users!events_organizer_id_fkey(name, company)
-        )
+        events!event_attendees_event_id_fkey(*)
       `)
       .eq('user_id', userId);
 
@@ -209,10 +216,13 @@ export class DatabaseService {
       return [];
     }
 
-    return data?.map(item => item.events) || [];
+    const flatData = Array.isArray(data) ? flattenArray(data) : [];
+    return flatData
+      .filter(item => item && typeof item === 'object' && !Array.isArray(item) && item.events && typeof item.events === 'object')
+      .map(item => item.events)
+      .filter(e => e && e.id && e.title && e.date && e.time && e.venue && e.organizer_id && e.category && e.status && e.created_at && e.updated_at);
   }
 
-  // Speaker operations
   static async getEventSpeakers(eventId: string): Promise<Speaker[]> {
     const { data, error } = await supabase
       .from('speakers')
@@ -228,29 +238,10 @@ export class DatabaseService {
     return data || [];
   }
 
-  static async addSpeaker(speakerData: Omit<Speaker, 'id' | 'created_at'>): Promise<string | null> {
-    const { data, error } = await supabase
-      .from('speakers')
-      .insert([speakerData])
-      .select('id')
-      .single();
-
-    if (error) {
-      console.error('Error adding speaker:', error);
-      return null;
-    }
-
-    return data.id;
-  }
-
-  // Agenda operations
   static async getEventAgenda(eventId: string): Promise<AgendaItem[]> {
     const { data, error } = await supabase
       .from('agenda_items')
-      .select(`
-        *,
-        speakers(name)
-      `)
+      .select('*')
       .eq('event_id', eventId)
       .order('start_time');
 
@@ -261,82 +252,4 @@ export class DatabaseService {
 
     return data || [];
   }
-
-  static async addAgendaItem(agendaData: Omit<AgendaItem, 'id' | 'created_at'>): Promise<string | null> {
-    const { data, error } = await supabase
-      .from('agenda_items')
-      .insert([agendaData])
-      .select('id')
-      .single();
-
-    if (error) {
-      console.error('Error adding agenda item:', error);
-      return null;
-    }
-
-    return data.id;
-  }
-
-  // Social accounts operations
-  static async getUserSocialAccounts(userId: string): Promise<SocialAccount[]> {
-    const { data, error } = await supabase
-      .from('social_accounts')
-      .select('*')
-      .eq('user_id', userId)
-      .order('platform');
-
-    if (error) {
-      console.error('Error fetching social accounts:', error);
-      return [];
-    }
-
-    return data || [];
-  }
-
-  static async addSocialAccount(socialData: Omit<SocialAccount, 'id' | 'created_at'>): Promise<string | null> {
-    const { data, error } = await supabase
-      .from('social_accounts')
-      .insert([socialData])
-      .select('id')
-      .single();
-
-    if (error) {
-      console.error('Error adding social account:', error);
-      return null;
-    }
-
-    return data.id;
-  }
-
-  static async removeSocialAccount(accountId: string): Promise<boolean> {
-    const { error } = await supabase
-      .from('social_accounts')
-      .delete()
-      .eq('id', accountId);
-
-    if (error) {
-      console.error('Error removing social account:', error);
-      return false;
-    }
-
-    return true;
-  }
-
-  // Real-time subscriptions
-  static subscribeToEvents(callback: (payload: any) => void) {
-    return supabase
-      .channel('events')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, callback)
-      .subscribe();
-  }
-
-  static subscribeToEventAttendees(eventId: string, callback: (payload: any) => void) {
-    return supabase
-      .channel(`event_attendees_${eventId}`)
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'event_attendees', filter: `event_id=eq.${eventId}` }, 
-        callback
-      )
-      .subscribe();
-  }
-} 
+}

@@ -3,12 +3,87 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Calendar, Clock, MapPin } from 'lucide-react-native';
 import AgendaItem from '@/components/AgendaItem';
+import LogoutButton from '@/components/LogoutButton';
 import { mockEvents } from '@/data/mockData';
 import { Colors, Spacing, BorderRadius, Typography } from '@/constants/Colors';
 import { Event, AgendaItem as AgendaItemType } from '@/types';
+import { useAuth } from '../../contexts/AuthContext';
+import { DatabaseService } from '../../services/database';
+import { useEffect } from 'react';
+import { useFocusEffect } from 'expo-router';
 
 export default function AgendaScreen() {
-  const [selectedEvent, setSelectedEvent] = useState<Event>(mockEvents[0]);
+  const { user } = useAuth();
+  const [events, setEvents] = useState<Event[]>([]);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchEventsAndAgendas = async () => {
+    if (!user) return;
+    setLoading(true);
+    const userEventsRaw = await DatabaseService.getUserEvents(user.id);
+    // Map to full Event type
+    const eventsWithAgendas = await Promise.all(
+      userEventsRaw.map(async (event) => {
+        // Organizer
+        let organizer = {
+          id: event.organizer_id,
+          name: 'Unknown Organizer',
+          email: '',
+          role: 'organizer' as 'organizer',
+        };
+        // Attendees
+        const attendees = await DatabaseService.getEventAttendees(event.id);
+        // Speakers
+        const speakersRaw = await DatabaseService.getEventSpeakers(event.id);
+        const speakers = speakersRaw.map(s => ({
+          ...s,
+          bio: s.bio || '',
+          company: s.company || '',
+          position: s.position || '',
+          sessions: [], // Provide empty array for sessions
+        }));
+        // Agenda
+        const agendaRaw = await DatabaseService.getEventAgenda(event.id);
+        // Map agenda items to AgendaItem type
+        const agenda = agendaRaw.map(a => ({
+          id: a.id,
+          title: a.title,
+          description: a.description || '',
+          startTime: a.start_time,
+          endTime: a.end_time,
+          speaker: speakers.find(s => s.id === a.speaker_id),
+          location: a.location,
+          type: a.type || 'session',
+        }));
+        return {
+          id: event.id,
+          title: event.title,
+          description: event.description,
+          date: event.date,
+          time: event.time,
+          venue: event.venue,
+          organizer,
+          speakers,
+          agenda,
+          attendees,
+          maxAttendees: event.max_attendees,
+          isRegistered: true,
+          category: event.category as 'conference' | 'workshop' | 'networking' | 'seminar',
+          status: event.status as 'upcoming' | 'ongoing' | 'completed',
+        };
+      })
+    );
+    setEvents(eventsWithAgendas);
+    setSelectedEvent(eventsWithAgendas[0] || null);
+    setLoading(false);
+  };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchEventsAndAgendas();
+    }, [user])
+  );
 
   const handleAgendaItemPress = (item: AgendaItemType) => {
     console.log('Navigate to agenda item details:', item.id);
@@ -24,72 +99,24 @@ export default function AgendaScreen() {
   };
 
   const getEventDuration = () => {
-    if (selectedEvent.agenda.length === 0) return '';
-    
+    if (!selectedEvent || !selectedEvent.agenda || selectedEvent.agenda.length === 0) return '';
     const firstItem = selectedEvent.agenda[0];
     const lastItem = selectedEvent.agenda[selectedEvent.agenda.length - 1];
-    
+    if (!firstItem || !lastItem) return '';
     return `${firstItem.startTime} - ${lastItem.endTime}`;
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Agenda</Text>
-        
-        {/* Event Selector */}
-        <View style={styles.eventSelector}>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.eventSelectorContent}
-          >
-            {mockEvents
-              .filter(event => event.isRegistered && event.agenda.length > 0)
-              .map(event => (
-                <TouchableOpacity
-                  key={event.id}
-                  style={[
-                    styles.eventChip,
-                    selectedEvent.id === event.id && styles.eventChipActive
-                  ]}
-                  onPress={() => setSelectedEvent(event)}
-                >
-                  <Text
-                    style={[
-                      styles.eventChipText,
-                      selectedEvent.id === event.id && styles.eventChipTextActive
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {event.title}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-          </ScrollView>
+        <View style={styles.headerTop}>
+          <Text style={styles.title}>Agenda</Text>
+          <LogoutButton 
+            size={20} 
+            color={Colors.textSecondary}
+            style={styles.logoutButton}
+          />
         </View>
-
-        {/* Event Info */}
-        {selectedEvent && (
-          <View style={styles.eventInfo}>
-            <View style={styles.eventInfoHeader}>
-              <Calendar size={16} color={Colors.primary} />
-              <Text style={styles.eventDate}>
-                {formatEventDate(selectedEvent.date)}
-              </Text>
-            </View>
-            <View style={styles.eventInfoRow}>
-              <Clock size={14} color={Colors.textSecondary} />
-              <Text style={styles.eventTime}>{getEventDuration()}</Text>
-            </View>
-            <View style={styles.eventInfoRow}>
-              <MapPin size={14} color={Colors.textSecondary} />
-              <Text style={styles.eventVenue} numberOfLines={1}>
-                {selectedEvent.venue}
-              </Text>
-            </View>
-          </View>
-        )}
       </View>
 
       <ScrollView 
@@ -97,25 +124,53 @@ export default function AgendaScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.agendaContent}
       >
-        {selectedEvent && selectedEvent.agenda.length > 0 ? (
-          selectedEvent.agenda.map(item => (
-            <AgendaItem
-              key={item.id}
-              item={item}
-              onPress={() => handleAgendaItemPress(item)}
-            />
-          ))
-        ) : (
+        {loading ? (
+          <Text style={{ textAlign: 'center', marginTop: 32 }}>Loading agendas...</Text>
+        ) : events.length === 0 ? (
           <View style={styles.emptyState}>
             <Calendar size={48} color={Colors.textLight} />
             <Text style={styles.emptyStateText}>No agenda available</Text>
             <Text style={styles.emptyStateSubtext}>
-              {mockEvents.filter(e => e.isRegistered).length === 0
-                ? 'Register for events to see their agenda'
-                : 'Check back later for event details'
-              }
+              Register for events to see their agenda
             </Text>
           </View>
+        ) : (
+          events.map(event => (
+            <View key={event.id} style={{ marginBottom: 32 }}>
+              <View style={styles.eventInfo}>
+                <View style={styles.eventInfoHeader}>
+                  <Calendar size={16} color={Colors.primary} />
+                  <Text style={styles.eventDate}>
+                    {formatEventDate(event.date)}
+                  </Text>
+                </View>
+                <Text style={styles.eventTitle}>{event.title}</Text>
+                <View style={styles.eventInfoRow}>
+                  <Clock size={14} color={Colors.textSecondary} />
+                  <Text style={styles.eventTime}>{event.time}</Text>
+                </View>
+                <View style={styles.eventInfoRow}>
+                  <MapPin size={14} color={Colors.textSecondary} />
+                  <Text style={styles.eventVenue} numberOfLines={1}>
+                    {event.venue}
+                  </Text>
+                </View>
+              </View>
+              {event.agenda && event.agenda.length > 0 ? (
+                event.agenda.map(item => (
+                  <AgendaItem
+                    key={item.id}
+                    item={item}
+                    onPress={() => handleAgendaItemPress(item)}
+                  />
+                ))
+              ) : (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyStateText}>No agenda for this event</Text>
+                </View>
+              )}
+            </View>
+          ))
         )}
       </ScrollView>
     </SafeAreaView>
@@ -139,12 +194,20 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  title: {
-    ...Typography.h1,
-    color: Colors.text,
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.md,
     marginBottom: Spacing.md,
+  },
+  title: {
+    ...Typography.h1,
+    color: Colors.text,
+  },
+  logoutButton: {
+    padding: Spacing.sm,
   },
   eventSelector: {
     marginBottom: Spacing.md,
@@ -205,6 +268,12 @@ const styles = StyleSheet.create({
     ...Typography.bodySmall,
     color: Colors.textSecondary,
     flex: 1,
+  },
+  eventTitle: {
+    ...Typography.h2,
+    color: Colors.text,
+    fontWeight: '600',
+    marginBottom: Spacing.xs,
   },
   agendaContainer: {
     flex: 1,

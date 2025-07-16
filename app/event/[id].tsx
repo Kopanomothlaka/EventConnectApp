@@ -1,17 +1,101 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ToastAndroid, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, MapPin, Clock, Users, Calendar, User, Mail, Linkedin } from 'lucide-react-native';
-import { mockEvents, mockUser } from '@/data/mockData';
+import { ArrowLeft, MapPin, Clock, Users, Calendar, User, Mail, Linkedin, Edit3, X, Check as Checkmark, Circle } from 'lucide-react-native';
+import LogoutButton from '@/components/LogoutButton';
+import { DatabaseService } from '../../services/database';
+import { Event, User as UserType, Speaker, AgendaItem } from '@/types';
 import { Colors, Spacing, BorderRadius, Typography } from '@/constants/Colors';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function EventDetailsScreen() {
   const { id } = useLocalSearchParams();
+  const { user } = useAuth();
   const [isRegistered, setIsRegistered] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
+  const [event, setEvent] = useState<Event | null>(null);
+  const [attendees, setAttendees] = useState<UserType[]>([]);
+  const [speakers, setSpeakers] = useState<Speaker[]>([]);
+  const [agenda, setAgenda] = useState<AgendaItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const event = mockEvents.find(e => e.id === id);
+  useEffect(() => {
+    if (id) {
+      fetchEventDetails(id as string);
+    }
+  }, [id]);
+
+  const fetchEventDetails = async (eventId: string) => {
+    setLoading(true);
+    const dbEvent = await DatabaseService.getEvent(eventId);
+    console.log('Fetched event:', dbEvent);
+    if (!dbEvent) {
+      setEvent(null);
+      setLoading(false);
+      return;
+    }
+    let organizer = (dbEvent as any)['users']
+      ? { ...(dbEvent as any)['users'], id: dbEvent.organizer_id }
+      : null;
+    if (!organizer && dbEvent.organizer_id) {
+      const organizerUser = await DatabaseService.getUser(dbEvent.organizer_id);
+      organizer = organizerUser
+        ? { ...organizerUser, id: dbEvent.organizer_id }
+        : { id: dbEvent.organizer_id, name: 'Unknown Organizer', email: '' };
+    }
+    const eventAttendees = await DatabaseService.getEventAttendees(eventId);
+    const eventSpeakersRaw = await DatabaseService.getEventSpeakers(eventId);
+    const eventSpeakers: Speaker[] = eventSpeakersRaw.map((s: any) => ({
+      ...s,
+      sessions: [], // or fetch if needed
+    }));
+    const eventAgendaRaw = await DatabaseService.getEventAgenda(eventId);
+    const eventAgenda: AgendaItem[] = eventAgendaRaw.map((a: any) => ({
+      id: a.id,
+      title: a.title,
+      description: a.description,
+      startTime: a.start_time,
+      endTime: a.end_time,
+      speaker: eventSpeakers.find(s => s.id === a.speaker_id),
+      location: a.location,
+      type: a.type || 'session',
+    }));
+    setEvent({
+      id: dbEvent.id,
+      title: dbEvent.title,
+      description: dbEvent.description,
+      date: dbEvent.date,
+      time: dbEvent.time,
+      venue: dbEvent.venue,
+      organizer,
+      speakers: eventSpeakers,
+      agenda: eventAgenda,
+      attendees: eventAttendees as UserType[],
+      maxAttendees: dbEvent.max_attendees,
+      isRegistered: false, // You can check registration status if needed
+      category: (dbEvent.category as 'conference' | 'workshop' | 'networking' | 'seminar'),
+      status: (dbEvent.status as 'upcoming' | 'ongoing' | 'completed'),
+    });
+    setAttendees(eventAttendees as UserType[]);
+    setSpeakers(eventSpeakers);
+    setAgenda(eventAgenda);
+    // Check if user is registered
+    if (user) {
+      setIsRegistered((eventAttendees as UserType[]).some(a => a.id === user.id));
+    } else {
+      setIsRegistered(false);
+    }
+    setLoading(false);
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Text style={{ textAlign: 'center', marginTop: 32 }}>Loading event details...</Text>
+      </SafeAreaView>
+    );
+  }
 
   if (!event) {
     return (
@@ -43,28 +127,62 @@ export default function EventDetailsScreen() {
     });
   };
 
-  const handleRegister = async () => {
-    if (event.maxAttendees && event.attendees.length >= event.maxAttendees) {
-      Alert.alert('Event Full', 'This event has reached its maximum capacity.');
-      return;
-    }
+  const isOwnEvent = user && event && event.organizer && user.id === event.organizer.id;
 
-    setIsRegistering(true);
-    
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setIsRegistered(true);
-      Alert.alert('Success', 'You have successfully registered for this event!');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to register for event. Please try again.');
-    } finally {
-      setIsRegistering(false);
+  const showToast = (message: string) => {
+    if (Platform.OS === 'android') {
+      ToastAndroid.show(message, ToastAndroid.SHORT);
+    } else {
+      Alert.alert(message);
     }
   };
 
+  const handleRegister = async () => {
+    if (!user || !event) return;
+    if (user.id === event.organizer.id) {
+      Alert.alert('You cannot register for your own event.');
+      return;
+    }
+    if (event.maxAttendees && attendees.length >= event.maxAttendees) {
+      Alert.alert('Event Full', 'This event has reached its maximum capacity.');
+      return;
+    }
+    if (isRegistered) {
+      showToast('You are already registered for this event.');
+      return;
+    }
+    Alert.alert(
+      'Register for Event',
+      'Are you sure you want to register for this event?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Register',
+          onPress: async () => {
+            setIsRegistering(true);
+            try {
+              const success = await DatabaseService.registerForEvent(event.id, user.id);
+              if (success) {
+                setIsRegistered(true);
+                showToast('You have successfully registered for this event!');
+                await fetchEventDetails(event.id); // Refresh event details
+                router.replace('/'); // Go back to Home and trigger refresh
+              } else {
+                Alert.alert('Error', 'Failed to register for event. Please try again.');
+              }
+            } catch (error) {
+              Alert.alert('Error', 'Failed to register for event. Please try again.');
+            } finally {
+              setIsRegistering(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleUnregister = async () => {
+    if (!user || !event) return;
     Alert.alert(
       'Unregister',
       'Are you sure you want to unregister from this event?',
@@ -75,18 +193,40 @@ export default function EventDetailsScreen() {
           style: 'destructive',
           onPress: async () => {
             setIsRegistering(true);
-            
             try {
-              // Simulate API call
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              
-              setIsRegistered(false);
-              Alert.alert('Success', 'You have been unregistered from this event.');
+              const success = await DatabaseService.unregisterFromEvent(event.id, user.id);
+              if (success) {
+                setIsRegistered(false);
+                showToast('You have been unregistered from this event.');
+                await fetchEventDetails(event.id); // Refresh event details
+                router.replace('/'); // Go back to Home and trigger refresh
+              }
             } catch (error) {
               Alert.alert('Error', 'Failed to unregister from event. Please try again.');
             } finally {
               setIsRegistering(false);
             }
+          },
+        },
+      ]
+    );
+  };
+
+  // Add edit/delete handlers
+  const handleEdit = () => {
+    router.push(`/organizer/edit-event?id=${encodeURIComponent(event.id)}`);
+  };
+  const handleDelete = () => {
+    Alert.alert(
+      'Delete Event',
+      'Are you sure you want to delete this event? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete', style: 'destructive', onPress: async () => {
+            await DatabaseService.deleteEvent(event.id);
+            showToast('Event deleted');
+            router.back();
           }
         }
       ]
@@ -100,7 +240,23 @@ export default function EventDetailsScreen() {
           <ArrowLeft size={24} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Event Details</Text>
-        <View style={styles.placeholder} />
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {isOwnEvent && (
+            <>
+              <TouchableOpacity style={styles.iconButton} onPress={handleEdit}>
+                <Edit3 size={22} color={Colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.iconButton} onPress={handleDelete}>
+                <X size={22} color={Colors.error} />
+              </TouchableOpacity>
+            </>
+          )}
+          <LogoutButton 
+            size={20} 
+            color={Colors.textSecondary}
+            style={styles.headerLogoutButton}
+          />
+        </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -132,12 +288,40 @@ export default function EventDetailsScreen() {
               {event.maxAttendees ? `/${event.maxAttendees}` : ''} attending
             </Text>
           </View>
+          {/* Registration status icon for attendees */}
+          {!isOwnEvent && (
+            <View style={styles.registrationStatusRow}>
+              {isRegistered ? (
+                <View style={styles.registeredIconBadge}>
+                  <Checkmark size={18} color={Colors.white} />
+                  <Text style={styles.registrationStatusText}>Registered</Text>
+                </View>
+              ) : (
+                <View style={styles.unregisteredIconBadge}>
+                  <Circle size={18} color={Colors.textLight} />
+                  <Text style={styles.registrationStatusText}>Not Registered</Text>
+                </View>
+              )}
+            </View>
+          )}
+        </View>
+
+        {/* Organizer info always visible */}
+        <View style={styles.organizerSection}>
+          <Text style={styles.sectionTitle}>Organizer</Text>
+          <View style={styles.organizerCard}>
+            <User size={24} color={Colors.primary} />
+            <View style={styles.organizerInfo}>
+              <Text style={styles.organizerName}>{event.organizer.name || 'Unknown Organizer'}</Text>
+              <Text style={styles.organizerEmail}>{event.organizer.email || 'No email'}</Text>
+            </View>
+          </View>
         </View>
 
         {event.speakers && event.speakers.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Speakers</Text>
-            {event.speakers.map(speaker => (
+            {event.speakers.map((speaker: any) => (
               <View key={speaker.id} style={styles.speakerCard}>
                 <View style={styles.speakerInfo}>
                   <Text style={styles.speakerName}>{speaker.name}</Text>
@@ -154,7 +338,7 @@ export default function EventDetailsScreen() {
         {event.agenda && event.agenda.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Agenda</Text>
-            {event.agenda.map(item => (
+            {event.agenda.map((item: any) => (
               <View key={item.id} style={styles.agendaItem}>
                 <View style={styles.agendaTime}>
                   <Text style={styles.agendaTimeText}>
@@ -173,43 +357,48 @@ export default function EventDetailsScreen() {
           </View>
         )}
 
-        <View style={styles.organizerSection}>
-          <Text style={styles.sectionTitle}>Organizer</Text>
-          <View style={styles.organizerCard}>
-            <User size={24} color={Colors.primary} />
-            <View style={styles.organizerInfo}>
-              <Text style={styles.organizerName}>{event.organizer.name}</Text>
-              <Text style={styles.organizerEmail}>{event.organizer.email}</Text>
-            </View>
+        {user && event.organizer && user.id === event.organizer.id && attendees.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Registered Attendees</Text>
+            {attendees.map((att: any) => (
+              <View key={att.id} style={{ marginBottom: 8, padding: 8, backgroundColor: '#f5f5f5', borderRadius: 8 }}>
+                <Text style={{ fontWeight: 'bold' }}>{att.name}</Text>
+                <Text style={{ color: Colors.textSecondary }}>{att.email}</Text>
+              </View>
+            ))}
           </View>
-        </View>
+        )}
       </ScrollView>
 
       <View style={styles.footer}>
-        {isRegistered ? (
-          <TouchableOpacity 
-            style={styles.unregisterButton}
-            onPress={handleUnregister}
-            disabled={isRegistering}
-          >
-            <Text style={styles.unregisterButtonText}>
-              {isRegistering ? 'Unregistering...' : 'Unregister from Event'}
-            </Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity 
-            style={[
-              styles.registerButton,
-              (event.maxAttendees && event.attendees.length >= event.maxAttendees) ? styles.registerButtonDisabled : null
-            ]}
-            onPress={handleRegister}
-            disabled={isRegistering || Boolean(event.maxAttendees && event.attendees.length >= event.maxAttendees)}
-          >
-            <Text style={styles.registerButtonText}>
-              {isRegistering ? 'Registering...' : 
-               (event.maxAttendees && event.attendees.length >= event.maxAttendees) ? 'Event Full' : 'Register for Event'}
-            </Text>
-          </TouchableOpacity>
+        {!isOwnEvent && (
+          isRegistered ? (
+            <View style={styles.registeredStatus}>
+              <Text style={styles.registeredText}>You are registered <Text style={{ color: Colors.success }}>✔</Text></Text>
+              <TouchableOpacity 
+                style={styles.unregisterButton}
+                onPress={handleUnregister}
+                disabled={isRegistering}
+              >
+                <Text style={styles.unregisterButtonText}>
+                  {isRegistering ? 'Unregistering...' : 'Unregister'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity 
+              style={styles.registerButton}
+              onPress={handleRegister}
+              disabled={
+                isRegistering ||
+                !!(event && event.maxAttendees && attendees.length >= event.maxAttendees)
+              }
+            >
+              <Text style={styles.registerButtonText}>
+                {isRegistering ? 'Registering...' : (event && event.maxAttendees && attendees.length >= event.maxAttendees) ? 'Full' : 'Register'}
+              </Text>
+            </TouchableOpacity>
+          )
         )}
       </View>
     </SafeAreaView>
@@ -244,8 +433,13 @@ const styles = StyleSheet.create({
     color: Colors.text,
     fontWeight: '600',
   },
-  placeholder: {
+  headerLogoutButton: {
     width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   content: {
     flex: 1,
@@ -418,5 +612,57 @@ const styles = StyleSheet.create({
     ...Typography.body,
     color: Colors.primary,
     fontWeight: '500',
+  },
+  registeredStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+  },
+  registeredText: {
+    ...Typography.body,
+    color: Colors.success,
+    fontWeight: '600',
+  },
+  iconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 4,
+  },
+  registrationStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    gap: 8,
+  },
+  registeredIconBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.success,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    gap: 6,
+  },
+  unregisteredIconBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderWidth: 2,
+    borderColor: Colors.textLight,
+    gap: 6,
+  },
+  registrationStatusText: {
+    ...Typography.bodySmall,
+    color: Colors.text,
+    fontWeight: '500',
+    marginLeft: 4,
   },
 }); 

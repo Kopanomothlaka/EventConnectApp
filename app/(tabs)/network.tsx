@@ -1,15 +1,27 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { QrCode, Search, UserPlus, Users, Scan } from 'lucide-react-native';
 import ContactCard from '@/components/ContactCard';
+import LogoutButton from '@/components/LogoutButton';
 import { mockContacts, mockUser } from '@/data/mockData';
 import { Colors, Spacing, BorderRadius, Typography } from '@/constants/Colors';
 import { Contact } from '@/types';
+import { useAuth } from '../../contexts/AuthContext';
+// @ts-ignore
+import QRCode from 'react-native-qrcode-svg';
+import { Camera } from 'expo-camera';
+import { useEffect, useRef } from 'react';
 
 export default function NetworkScreen() {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'contacts' | 'qr'>('contacts');
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanned, setScanned] = useState(false);
+  const cameraRef = useRef(null);
 
   const filteredContacts = mockContacts.filter(contact =>
     contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -21,21 +33,55 @@ export default function NetworkScreen() {
     console.log('Navigate to contact details:', contact.id);
   };
 
-  const handleScanQR = () => {
-    // In a real app, this would open the camera for QR scanning
-    Alert.alert(
-      'QR Scanner',
-      'This would open the camera to scan QR codes from other attendees.',
-      [{ text: 'OK' }]
-    );
+  const handleScanQR = async () => {
+    console.log('Scan QR button pressed');
+    try {
+      let status;
+      // @ts-ignore
+      if (typeof Camera.requestCameraPermissionsAsync === 'function') {
+        // @ts-ignore
+        ({ status } = await Camera.requestCameraPermissionsAsync());
+      // @ts-ignore
+      } else if (typeof Camera.requestPermissionsAsync === 'function') {
+        // @ts-ignore
+        ({ status } = await Camera.requestPermissionsAsync());
+      } else {
+        throw new Error('No camera permission function available');
+      }
+      console.log('Camera permission status:', status);
+      setHasPermission(status === 'granted');
+      if (status === 'granted') {
+        setScanning(true);
+        setScanned(false);
+      } else {
+        Alert.alert('Camera permission denied', 'Please enable camera access in your device settings.');
+      }
+    } catch (e) {
+      console.log('Camera permission error:', e);
+      Alert.alert('Camera error', String(e));
+    }
+  };
+
+  const handleCloseScanner = () => {
+    setScanning(false);
+    setHasPermission(null);
+  };
+
+  const handleBarCodeScanned = ({ type, data }: { type: string; data: string }) => {
+    setScanned(true);
+    setScanning(false);
+    try {
+      const contact = JSON.parse(data);
+      // Add contact logic here (replace with real backend call if needed)
+      Alert.alert('Contact Scanned', `Name: ${contact.name}\nEmail: ${contact.email}`);
+      // Optionally update contacts state here
+    } catch (e) {
+      Alert.alert('Invalid QR Code', 'The scanned QR code is not a valid contact.');
+    }
   };
 
   const handleGenerateQR = () => {
-    Alert.alert(
-      'Your QR Code',
-      'This would display your personal QR code for others to scan.',
-      [{ text: 'OK' }]
-    );
+    setShowQRModal(true);
   };
 
   const handleAddContact = () => {
@@ -148,13 +194,79 @@ export default function NetworkScreen() {
           </View>
         </View>
       </View>
+      <Modal
+        visible={showQRModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowQRModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>My QR Code</Text>
+            <View style={styles.qrCodeContainer}>
+              {user && (
+                <QRCode
+                  value={JSON.stringify({
+                    id: user.id,
+                    name: user.user_metadata?.name || '',
+                    email: user.email || '',
+                    role: user.user_metadata?.role || '',
+                  })}
+                  size={200}
+                  color={Colors.primary}
+                  backgroundColor={Colors.white}
+                />
+              )}
+            </View>
+            <TouchableOpacity style={styles.closeButton} onPress={() => setShowQRModal(false)}>
+              <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        visible={scanning}
+        transparent
+        animationType="slide"
+        onRequestClose={handleCloseScanner}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { padding: 0, width: '90%', height: 400 }]}> 
+            <Text style={styles.modalTitle}>Scan QR Code</Text>
+            {hasPermission === null ? (
+              <Text>Requesting camera permission...</Text>
+            ) : hasPermission === false ? (
+              <Text>No access to camera</Text>
+            ) : (
+              <Camera
+                ref={cameraRef}
+                style={{ flex: 1, width: '100%' }}
+                onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
+                barCodeScannerSettings={{
+                  barCodeTypes: ['qr'], // Only scan QR codes
+                }}
+              />
+            )}
+            <TouchableOpacity style={styles.closeButton} onPress={handleCloseScanner}>
+              <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Network</Text>
+        <View style={styles.headerTop}>
+          <Text style={styles.title}>Network</Text>
+          <LogoutButton 
+            size={20} 
+            color={Colors.textSecondary}
+            style={styles.logoutButton}
+          />
+        </View>
         
         <View style={styles.tabSelector}>
           <TouchableOpacity
@@ -210,12 +322,17 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+  },
   title: {
     ...Typography.h1,
     color: Colors.text,
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.md,
-    marginBottom: Spacing.md,
+  },
+  logoutButton: {
+    marginLeft: 'auto',
   },
   tabSelector: {
     flexDirection: 'row',
@@ -405,5 +522,41 @@ const styles = StyleSheet.create({
     ...Typography.bodySmall,
     color: Colors.textSecondary,
     flex: 1,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalContent: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    alignItems: 'center',
+    width: 300,
+  },
+  modalTitle: {
+    ...Typography.h2,
+    color: Colors.primary,
+    marginBottom: Spacing.md,
+  },
+  qrCodeContainer: {
+    marginBottom: Spacing.lg,
+    marginTop: Spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeButton: {
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    ...Typography.body,
+    color: Colors.white,
+    fontWeight: '600',
   },
 });

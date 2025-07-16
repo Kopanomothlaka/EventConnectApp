@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { MapPin, Clock, Users, Calendar } from 'lucide-react-native';
+import { MapPin, Clock, Users, Calendar, Edit3, X, Check as Checkmark, Circle } from 'lucide-react-native';
 import { Event } from '@/types';
 import { Colors, Spacing, BorderRadius, Typography } from '@/constants/Colors';
 
@@ -9,11 +9,16 @@ interface EventCardProps {
   onPress: () => void;
   onRegister?: (eventId: string) => void;
   onUnregister?: (eventId: string) => void;
+  isRegistered?: boolean;
+  currentUserId?: string;
+  onEdit?: (eventId: string) => void;
+  onDelete?: (eventId: string) => void;
 }
 
-export default function EventCard({ event, onPress, onRegister, onUnregister }: EventCardProps) {
+export default function EventCard({ event, onPress, onRegister, onUnregister, isRegistered: isRegisteredProp, currentUserId, onEdit, onDelete }: EventCardProps) {
   const [isRegistering, setIsRegistering] = useState(false);
-  const [isRegistered, setIsRegistered] = useState(event.isRegistered);
+  const [isRegistered, setIsRegistered] = useState(isRegisteredProp ?? event.isRegistered);
+  const isOwnEvent = currentUserId && event.organizer && currentUserId === event.organizer.id;
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('en-US', {
@@ -98,7 +103,11 @@ export default function EventCard({ event, onPress, onRegister, onUnregister }: 
   };
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity
+      style={styles.card}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
       <View style={styles.header}>
         <View style={styles.dateContainer}>
           <Calendar size={16} color={Colors.primary} />
@@ -139,32 +148,29 @@ export default function EventCard({ event, onPress, onRegister, onUnregister }: 
 
       <View style={styles.footer}>
         <Text style={styles.organizerText}>by {event.organizer.name}</Text>
-        {isRegistered ? (
-          <TouchableOpacity 
-            style={styles.unregisterButton}
-            onPress={handleUnregister}
-            disabled={isRegistering}
-          >
-            <Text style={styles.unregisterButtonText}>
-              {isRegistering ? 'Unregistering...' : 'Unregister'}
-            </Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity 
-            style={[
-              styles.registerButton,
-              (event.maxAttendees && event.attendees.length >= event.maxAttendees) ? styles.registerButtonDisabled : null
-            ]}
-            onPress={handleRegister}
-            disabled={isRegistering || Boolean(event.maxAttendees && event.attendees.length >= event.maxAttendees)}
-          >
-            <Text style={styles.registerButtonText}>
-              {isRegistering ? 'Registering...' : 
-               (event.maxAttendees && event.attendees.length >= event.maxAttendees) ? 'Full' : 'Register'}
-            </Text>
-          </TouchableOpacity>
+        {isOwnEvent && (
+          <View style={styles.attendeeCountBadge}>
+            <Users size={14} color={Colors.secondary} />
+            <Text style={styles.attendeeCountText}>{event.attendees.length} attendee{event.attendees.length === 1 ? '' : 's'}</Text>
+          </View>
         )}
       </View>
+      {/* Registered icon for attendees at bottom right */}
+      {isRegistered && !isOwnEvent && (
+        <View style={styles.registeredIconContainer}>
+          <View style={styles.registeredIconBadge}>
+            <Checkmark size={18} color={Colors.white} />
+          </View>
+        </View>
+      )}
+      {/* Unregistered icon for attendees at bottom right */}
+      {!isRegistered && !isOwnEvent && (
+        <View style={styles.registeredIconContainer}>
+          <View style={styles.unregisteredIconBadge}>
+            <Circle size={18} color={Colors.textLight} />
+          </View>
+        </View>
+      )}
     </TouchableOpacity>
   );
 }
@@ -184,6 +190,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
+  },
+  cardRegistered: {
+    backgroundColor: Colors.textLight,
   },
   header: {
     flexDirection: 'row',
@@ -270,5 +279,77 @@ const styles = StyleSheet.create({
     ...Typography.bodySmall,
     color: Colors.white,
     fontWeight: '500',
+  },
+  registeredBadge: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.sm,
+    marginLeft: Spacing.xs,
+  },
+  registeredBadgeText: {
+    ...Typography.caption,
+    color: Colors.white,
+    fontWeight: '500',
+  },
+  iconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 4,
+  },
+  attendeeCountBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    marginTop: 4,
+    alignSelf: 'flex-start',
+    gap: 4,
+  },
+  attendeeCountText: {
+    ...Typography.bodySmall,
+    color: Colors.secondary,
+    fontWeight: '500',
+    marginLeft: 4,
+  },
+  registeredIconContainer: {
+    position: 'absolute',
+    right: 16,
+    bottom: 16,
+    zIndex: 10,
+  },
+  registeredIconBadge: {
+    backgroundColor: Colors.success,
+    borderRadius: 16,
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: Colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  unregisteredIconBadge: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: Colors.textLight,
+    shadowColor: Colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.10,
+    shadowRadius: 2,
+    elevation: 2,
   },
 });

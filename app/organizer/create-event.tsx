@@ -4,8 +4,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { ArrowLeft, Calendar, Clock, MapPin, Users, DollarSign, FileText, User, Plus, X } from 'lucide-react-native';
 import { Colors, Spacing, BorderRadius, Typography } from '@/constants/Colors';
+import LogoutButton from '@/components/LogoutButton';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function CreateEventScreen() {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -57,16 +61,72 @@ export default function CreateEventScreen() {
       Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
-
+    if (!user) {
+      Alert.alert('Error', 'You must be logged in as an organizer to create an event.');
+      return;
+    }
     setIsLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      // Insert event
+      const { data: event, error: eventError } = await supabase
+        .from('events')
+        .insert([
+          {
+            title: formData.title,
+            description: formData.description,
+            date: formData.date,
+            time: formData.time,
+            venue: formData.venue,
+            max_attendees: formData.maxAttendees ? Number(formData.maxAttendees) : null,
+            category: formData.category,
+            price: formData.price ? Number(formData.price) : null,
+            organizer_id: user.id,
+            status: 'upcoming',
+          },
+        ])
+        .select()
+        .single();
+      if (eventError || !event) {
+        setIsLoading(false);
+        Alert.alert('Error', eventError?.message || 'Failed to create event');
+        return;
+      }
+      // Insert speakers
+      for (const speaker of speakers) {
+        if (speaker.name) {
+          await supabase.from('speakers').insert([
+            {
+              event_id: event.id,
+              name: speaker.name,
+              company: speaker.company,
+              position: speaker.position,
+            },
+          ]);
+        }
+      }
+      // Insert agenda items
+      for (const item of agenda) {
+        if (item.title && item.startTime && item.endTime) {
+          await supabase.from('agenda_items').insert([
+            {
+              event_id: event.id,
+              title: item.title,
+              description: item.description,
+              start_time: item.startTime,
+              end_time: item.endTime,
+              type: 'session',
+            },
+          ]);
+        }
+      }
       setIsLoading(false);
       Alert.alert('Success', 'Event created successfully!', [
         { text: 'OK', onPress: () => router.back() }
       ]);
-    }, 1000);
+    } catch (e) {
+      setIsLoading(false);
+      Alert.alert('Error', 'An unexpected error occurred.');
+    }
   };
 
   const categories = [
@@ -84,7 +144,11 @@ export default function CreateEventScreen() {
             <ArrowLeft size={24} color={Colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Create Event</Text>
-          <View style={styles.placeholder} />
+          <LogoutButton 
+            size={20} 
+            color={Colors.textSecondary}
+            style={styles.headerLogoutButton}
+          />
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -384,8 +448,13 @@ const styles = StyleSheet.create({
     color: Colors.text,
     fontWeight: '600',
   },
-  placeholder: {
+  headerLogoutButton: {
     width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   content: {
     flex: 1,
