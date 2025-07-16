@@ -1,7 +1,8 @@
 {
   "expo": {
-    "name": "bolt-expo-nativewind",
-    "slug": "bolt-expo-nativewind",
+    "name": "EventConnectApp",
+    "slug": "eventconnectapp",
+    "owner": "kaypee10096",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -9,7 +10,10 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "runtimeVersion": {
+        "policy": "appVersion"
+      }
     },
     "web": {
       "bundler": "metro",
@@ -24,6 +28,22 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "android": {
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.CAMERA"
+      ],
+      "runtimeVersion": "1.0.0"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "923454e4-8656-4fcd-a5d3-8c2471aefefb"
+      }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/923454e4-8656-4fcd-a5d3-8c2471aefefb"
     }
   }
 }
