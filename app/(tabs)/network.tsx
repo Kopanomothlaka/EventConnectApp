@@ -10,7 +10,7 @@ import { Contact } from '@/types';
 import { useAuth } from '../../contexts/AuthContext';
 // @ts-ignore
 import QRCode from 'react-native-qrcode-svg';
-import { Camera } from 'expo-camera';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useEffect, useRef } from 'react';
 
 export default function NetworkScreen() {
@@ -18,7 +18,7 @@ export default function NetworkScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'contacts' | 'qr'>('contacts');
   const [showQRModal, setShowQRModal] = useState(false);
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [scanning, setScanning] = useState(false);
   const [scanned, setScanned] = useState(false);
   const cameraRef = useRef(null);
@@ -33,51 +33,19 @@ export default function NetworkScreen() {
     console.log('Navigate to contact details:', contact.id);
   };
 
-  const handleScanQR = async () => {
-    console.log('Scan QR button pressed');
-    try {
-      let status;
-      // @ts-ignore
-      if (typeof Camera.requestCameraPermissionsAsync === 'function') {
-        // @ts-ignore
-        ({ status } = await Camera.requestCameraPermissionsAsync());
-      // @ts-ignore
-      } else if (typeof Camera.requestPermissionsAsync === 'function') {
-        // @ts-ignore
-        ({ status } = await Camera.requestPermissionsAsync());
-      } else {
-        throw new Error('No camera permission function available');
-      }
-      console.log('Camera permission status:', status);
-      setHasPermission(status === 'granted');
-      if (status === 'granted') {
-        setScanning(true);
-        setScanned(false);
-      } else {
-        Alert.alert('Camera permission denied', 'Please enable camera access in your device settings.');
-      }
-    } catch (e) {
-      console.log('Camera permission error:', e);
-      Alert.alert('Camera error', String(e));
-    }
+  const handleScanQR = () => {
+    setScanning(true);
+    setScanned(false);
   };
 
   const handleCloseScanner = () => {
     setScanning(false);
-    setHasPermission(null);
   };
 
-  const handleBarCodeScanned = ({ type, data }: { type: string; data: string }) => {
+  const handleBarCodeScanned = ({ data }: { data: string }) => {
     setScanned(true);
     setScanning(false);
-    try {
-      const contact = JSON.parse(data);
-      // Add contact logic here (replace with real backend call if needed)
-      Alert.alert('Contact Scanned', `Name: ${contact.name}\nEmail: ${contact.email}`);
-      // Optionally update contacts state here
-    } catch (e) {
-      Alert.alert('Invalid QR Code', 'The scanned QR code is not a valid contact.');
-    }
+    Alert.alert('QR Code Scanned', data);
   };
 
   const handleGenerateQR = () => {
@@ -203,21 +171,19 @@ export default function NetworkScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>My QR Code</Text>
-            <View style={styles.qrCodeContainer}>
-              {user && (
-                <QRCode
-                  value={JSON.stringify({
-                    id: user.id,
-                    name: user.user_metadata?.name || '',
-                    email: user.email || '',
-                    role: user.user_metadata?.role || '',
-                  })}
-                  size={200}
-                  color={Colors.primary}
-                  backgroundColor={Colors.white}
-                />
-              )}
-            </View>
+            {user && (
+              <QRCode
+                value={JSON.stringify({
+                  id: user.id,
+                  name: user.user_metadata?.name || '',
+                  email: user.email || '',
+                  role: user.user_metadata?.role || '',
+                })}
+                size={200}
+                color={Colors.primary}
+                backgroundColor={Colors.white}
+              />
+            )}
             <TouchableOpacity style={styles.closeButton} onPress={() => setShowQRModal(false)}>
               <Text style={styles.closeButtonText}>Close</Text>
             </TouchableOpacity>
@@ -233,18 +199,20 @@ export default function NetworkScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { padding: 0, width: '90%', height: 400 }]}> 
             <Text style={styles.modalTitle}>Scan QR Code</Text>
-            {hasPermission === null ? (
+            {!cameraPermission ? (
               <Text>Requesting camera permission...</Text>
-            ) : hasPermission === false ? (
-              <Text>No access to camera</Text>
+            ) : !cameraPermission.granted ? (
+              <View>
+                <Text>We need your permission to show the camera</Text>
+                <TouchableOpacity style={styles.closeButton} onPress={requestCameraPermission}>
+                  <Text style={styles.closeButtonText}>Grant permission</Text>
+                </TouchableOpacity>
+              </View>
             ) : (
-              <Camera
-                ref={cameraRef}
+              <CameraView
                 style={{ flex: 1, width: '100%' }}
-                onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
-                barCodeScannerSettings={{
-                  barCodeTypes: ['qr'], // Only scan QR codes
-                }}
+                barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
               />
             )}
             <TouchableOpacity style={styles.closeButton} onPress={handleCloseScanner}>
