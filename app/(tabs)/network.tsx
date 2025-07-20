@@ -289,7 +289,7 @@ export default function NetworkScreen() {
         imageStyle={styles.headerBackgroundImage}
       >
         <LinearGradient
-          colors={['rgba(236, 72, 153, 0.8)', 'rgba(139, 92, 246, 0.9)']}
+          colors={['rgba(125,181,180,0.85)', 'rgba(90,140,139,0.95)']}
           style={styles.headerGradient}
         >
           <View style={styles.header}>
@@ -342,9 +342,9 @@ export default function NetworkScreen() {
         </LinearGradient>
       </ImageBackground>
 
-      <View style={styles.contentContainer}>
+      <ScrollView style={styles.contentContainer} contentContainerStyle={{flexGrow: 1}}>
         {activeTab === 'contacts' ? renderContactsTab() : renderQRTab()}
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ImageBackground } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ImageBackground, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Colors, Spacing, Typography, BorderRadius, Shadows } from '@/constants/Colors';
@@ -50,10 +50,10 @@ export default function WelcomeScreen() {
         imageStyle={styles.backgroundImageStyle}
       >
         <LinearGradient
-          colors={['rgba(99, 102, 241, 0.9)', 'rgba(139, 92, 246, 0.8)']}
+          colors={['rgba(125,181,180,0.85)', 'rgba(90,140,139,0.95)']}
           style={styles.gradient}
         >
-          <View style={styles.content}>
+          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             <View style={styles.header}>
               <View style={styles.logoContainer}>
                 <Sparkles size={32} color={Colors.white} />
@@ -63,7 +63,6 @@ export default function WelcomeScreen() {
                 Connect, Network, and Grow at Amazing Events
               </Text>
             </View>
-
             <View style={styles.features}>
               <View style={[styles.feature, Shadows.medium]}>
                 <View style={styles.featureIcon}>
@@ -74,7 +73,6 @@ export default function WelcomeScreen() {
                   Find and join events that match your interests and career goals
                 </Text>
               </View>
-              
               <View style={[styles.feature, Shadows.medium]}>
                 <View style={styles.featureIcon}>
                   <Users size={24} color={Colors.secondary} />
@@ -84,7 +82,6 @@ export default function WelcomeScreen() {
                   Connect with professionals and expand your network
                 </Text>
               </View>
-              
               <View style={[styles.feature, Shadows.medium]}>
                 <View style={styles.featureIcon}>
                   <TrendingUp size={24} color={Colors.accent} />
@@ -95,7 +92,6 @@ export default function WelcomeScreen() {
                 </Text>
               </View>
             </View>
-
             <View style={styles.actions}>
               <TouchableOpacity style={[styles.primaryButton, Shadows.medium]} onPress={handleGetStarted}>
                 <LinearGradient
@@ -105,12 +101,11 @@ export default function WelcomeScreen() {
                   <Text style={styles.primaryButtonText}>Get Started</Text>
                 </LinearGradient>
               </TouchableOpacity>
-              
               <TouchableOpacity style={styles.secondaryButton} onPress={handleSignIn}>
                 <Text style={styles.secondaryButtonText}>I already have an account</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </ScrollView>
         </LinearGradient>
       </ImageBackground>
     </SafeAreaView>
@@ -131,7 +126,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    flex: 1,
     paddingHorizontal: Spacing.xl,
     justifyContent: 'space-between',
     paddingVertical: Spacing.xxl,

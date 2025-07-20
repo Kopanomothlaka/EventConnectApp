@@ -167,7 +167,7 @@ export default function HomeScreen() {
         imageStyle={styles.headerBackgroundImage}
       >
         <LinearGradient
-          colors={['rgba(99, 102, 241, 0.8)', 'rgba(139, 92, 246, 0.9)']}
+          colors={['rgba(125,181,180,0.85)', 'rgba(90,140,139,0.95)']}
           style={styles.headerGradient}
         >
           <View style={styles.header}>

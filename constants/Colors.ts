@@ -1,9 +1,9 @@
 export const Colors = {
   // Primary brand colors with modern gradients
-  primary: '#2563EB', // Modern blue
-  primaryDark: '#1D4ED8',
-  primaryLight: '#60A5FA',
-  primaryGradient: ['#2563EB', '#3B82F6'],
+  primary: '#7db5b4', // Custom teal
+  primaryDark: '#5a8c8b',
+  primaryLight: '#a8d6d5',
+  primaryGradient: ['#7db5b4', '#5a8c8b'],
   
   // Secondary colors
   secondary: '#EC4899', // Modern pink
@@ -43,8 +43,8 @@ export const Colors = {
   infoLight: '#DBEAFE',
   
   // Category colors
-  conference: '#2563EB',
-  workshop: '#3B82F6',
+  conference: '#7db5b4',
+  workshop: '#5a8c8b',
   networking: '#EC4899',
   seminar: '#F59E0B',
   meetup: '#10B981',

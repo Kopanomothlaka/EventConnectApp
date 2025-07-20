@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Eye, EyeOff, Mail, Lock, ArrowLeft } from 'lucide-react-native';
@@ -58,6 +58,11 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.content}>
+          <Image
+            source={require('../../assets/images/Sleek__EventConnect__Logo_with_Overlapping_Circles-removebg-preview.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
           <View style={styles.titleContainer}>
             <Text style={styles.title}>Welcome Back</Text>
             <Text style={styles.subtitle}>Sign in to your account</Text>
@@ -162,17 +167,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     justifyContent: 'center',
   },
+  logo: {
+    width: 120,
+    height: 120,
+    alignSelf: 'center',
+    marginBottom: Spacing.xl,
+  },
   titleContainer: {
     marginBottom: Spacing.xl,
+    alignItems: 'center',
   },
   title: {
     ...Typography.h1,
     color: Colors.text,
     marginBottom: Spacing.sm,
+    textAlign: 'center',
   },
   subtitle: {
     ...Typography.body,
     color: Colors.textSecondary,
+    textAlign: 'center',
   },
   form: {
     gap: Spacing.md,
