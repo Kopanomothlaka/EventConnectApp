@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Building, MapPin, MessageCircle, Linkedin, Star, CheckCircle } from 'lucide-react-native';
+import { Building, MapPin, MessageCircle, Linkedin, Star, CircleCheck as CheckCircle } from 'lucide-react-native';
 import { Contact } from '@/types';
 import { Colors, Spacing, BorderRadius, Typography, Shadows } from '@/constants/Colors';
 import { LinearGradient } from 'expo-linear-gradient';
