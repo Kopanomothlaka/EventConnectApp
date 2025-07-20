@@ -340,12 +340,10 @@ export default function NetworkScreen() {
             </View>
           </View>
         </LinearGradient>
-      </Modal>
       </ImageBackground>
 
       <View style={styles.contentContainer}>
         {activeTab === 'contacts' ? renderContactsTab() : renderQRTab()}
-        </View>
       </View>
     </SafeAreaView>
   );
@@ -532,7 +530,6 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   generateQRButton: {
-    background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
     backgroundColor: Colors.primary, // fallback
     flexDirection: 'row',
     alignItems: 'center',

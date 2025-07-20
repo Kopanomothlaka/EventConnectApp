@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ImageBackground } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ImageBackground, Modal, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search, Plus, Filter, RefreshCw, Sparkles, TrendingUp, Calendar as CalendarIcon } from 'lucide-react-native';
 import { router } from 'expo-router';
@@ -21,6 +21,8 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [showMyEvents, setShowMyEvents] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [showUpcomingOnly, setShowUpcomingOnly] = useState(false);
 
   // Use authenticated user data if available, otherwise fall back to mock data
   const currentUser = user ? {
@@ -117,7 +119,13 @@ export default function HomeScreen() {
     const matchesSearch = event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          event.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'all' || event.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    let matchesUpcoming = true;
+    if (showUpcomingOnly && event.date) {
+      const today = new Date();
+      const eventDate = new Date(event.date);
+      matchesUpcoming = eventDate >= today;
+    }
+    return matchesSearch && matchesCategory && matchesUpcoming;
   });
 
   const handleEventPress = (event: Event) => {
@@ -232,7 +240,7 @@ export default function HomeScreen() {
               placeholderTextColor={Colors.textLight}
             />
           </View>
-          <TouchableOpacity style={[styles.filterButton, Shadows.small]}>
+          <TouchableOpacity style={[styles.filterButton, Shadows.small]} onPress={() => setFilterModalVisible(true)}>
             <Filter size={20} color={Colors.primary} />
           </TouchableOpacity>
         </View>
@@ -266,7 +274,6 @@ export default function HomeScreen() {
             </TouchableOpacity>
           ))}
         </ScrollView>
-      </View>
       </View>
 
       <ScrollView 
@@ -304,6 +311,31 @@ export default function HomeScreen() {
           </View>
         )}
       </ScrollView>
+
+      <Modal
+        visible={filterModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setFilterModalVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ backgroundColor: 'white', borderRadius: 12, padding: 24, minWidth: 280 }}>
+            <Text style={{ fontWeight: 'bold', fontSize: 18, marginBottom: 16 }}>Filter Events</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+              <Text style={{ flex: 1, fontSize: 16 }}>Show only upcoming events</Text>
+              <Switch
+                value={showUpcomingOnly}
+                onValueChange={setShowUpcomingOnly}
+                trackColor={{ false: '#ccc', true: Colors.primaryLight }}
+                thumbColor={showUpcomingOnly ? Colors.primary : '#f4f3f4'}
+              />
+            </View>
+            <TouchableOpacity onPress={() => setFilterModalVisible(false)} style={{ marginTop: 8, alignSelf: 'flex-end' }}>
+              <Text style={{ color: Colors.primary, fontWeight: 'bold' }}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -314,7 +346,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
   },
   headerBackground: {
-    minHeight: 200,
+    height: 250,
   },
   headerBackgroundImage: {
     resizeMode: 'cover',
@@ -335,12 +367,13 @@ const styles = StyleSheet.create({
   headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.lg,
   },
   headerContent: {
     flex: 1,
+    maxWidth: '80%',
   },
   greetingContainer: {
     flexDirection: 'row',
@@ -393,6 +426,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
+    marginLeft: Spacing.md,
   },
   searchContainer: {
     flexDirection: 'row',

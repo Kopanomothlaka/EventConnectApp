@@ -400,7 +400,7 @@ export default function ProfileScreen() {
     { name: 'Instagram', icon: Instagram, color: '#E4405F' },
     { name: 'LinkedIn', icon: Linkedin, color: '#0077B5' },
     { name: 'WhatsApp', icon: MessageCircle, color: '#25D366' },
-    { name: 'Website', icon: Globe, color: '#6366F1' },
+    { name: 'Website', icon: Globe, color: '#2563EB' },
   ];
 
   const userEvents = mockEvents.filter(event => 
