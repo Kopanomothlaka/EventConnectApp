@@ -1,11 +1,11 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Modal, ImageBackground } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { QrCode, Search, UserPlus, Users, Scan } from 'lucide-react-native';
+import { QrCode, Search, UserPlus, Users, Scan, Wifi, Zap } from 'lucide-react-native';
 import ContactCard from '@/components/ContactCard';
 import LogoutButton from '@/components/LogoutButton';
 import { mockContacts, mockUser } from '@/data/mockData';
-import { Colors, Spacing, BorderRadius, Typography } from '@/constants/Colors';
+import { Colors, Spacing, BorderRadius, Typography, Shadows } from '@/constants/Colors';
 import { Contact } from '@/types';
 import { useAuth } from '../../contexts/AuthContext';
 // @ts-ignore
@@ -14,6 +14,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { DatabaseService } from '@/services/database';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function NetworkScreen() {
   const { user } = useAuth();
@@ -162,9 +163,11 @@ export default function NetworkScreen() {
   const renderQRTab = () => (
     <View style={styles.tabContent}>
       <View style={styles.qrSection}>
-        <View style={styles.qrCard}>
+        <View style={[styles.qrCard, Shadows.medium]}>
           <View style={styles.qrHeader}>
-            <QrCode size={24} color={Colors.primary} />
+            <View style={styles.qrIconContainer}>
+              <QrCode size={24} color={Colors.primary} />
+            </View>
             <Text style={styles.qrTitle}>Your QR Code</Text>
           </View>
           <Text style={styles.qrDescription}>
@@ -176,9 +179,11 @@ export default function NetworkScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.qrCard}>
+        <View style={[styles.qrCard, Shadows.medium]}>
           <View style={styles.qrHeader}>
-            <Scan size={24} color={Colors.secondary} />
+            <View style={[styles.qrIconContainer, { backgroundColor: Colors.secondaryLight }]}>
+              <Scan size={24} color={Colors.secondary} />
+            </View>
             <Text style={styles.qrTitle}>Scan QR Code</Text>
           </View>
           <Text style={styles.qrDescription}>
@@ -191,7 +196,7 @@ export default function NetworkScreen() {
         </View>
       </View>
 
-      <View style={styles.qrInfo}>
+      <View style={[styles.qrInfo, Shadows.small]}>
         <Text style={styles.qrInfoTitle}>How QR Networking Works</Text>
         <View style={styles.qrInfoSteps}>
           <View style={styles.qrInfoStep}>
@@ -278,49 +283,70 @@ export default function NetworkScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <Text style={styles.title}>Network</Text>
-          <LogoutButton 
-            size={20} 
-            color={Colors.textSecondary}
-            style={styles.logoutButton}
-          />
-        </View>
-        
-        <View style={styles.tabSelector}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'contacts' && styles.tabActive]}
-            onPress={() => setActiveTab('contacts')}
-          >
-            <Users size={16} color={activeTab === 'contacts' ? Colors.white : Colors.textSecondary} />
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === 'contacts' && styles.tabTextActive
-              ]}
-            >
-              Contacts ({mockContacts.length})
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'qr' && styles.tabActive]}
-            onPress={() => setActiveTab('qr')}
-          >
-            <QrCode size={16} color={activeTab === 'qr' ? Colors.white : Colors.textSecondary} />
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === 'qr' && styles.tabTextActive
-              ]}
-            >
-              QR Code
-            </Text>
-          </TouchableOpacity>
+      <ImageBackground
+        source={{ uri: 'https://images.pexels.com/photos/1181406/pexels-photo-1181406.jpeg?auto=compress&cs=tinysrgb&w=1200' }}
+        style={styles.headerBackground}
+        imageStyle={styles.headerBackgroundImage}
+      >
+        <LinearGradient
+          colors={['rgba(236, 72, 153, 0.8)', 'rgba(139, 92, 246, 0.9)']}
+          style={styles.headerGradient}
+        >
+          <View style={styles.header}>
+            <View style={styles.headerTop}>
+              <View style={styles.headerContent}>
+                <View style={styles.titleContainer}>
+                  <Wifi size={24} color={Colors.white} />
+                  <Text style={styles.title}>Network</Text>
+                </View>
+                <Text style={styles.subtitle}>Connect with amazing people</Text>
+              </View>
+              <LogoutButton 
+                size={20} 
+                color={Colors.white}
+                style={styles.logoutButton}
+              />
+            </View>
+            
+            <View style={styles.tabSelector}>
+              <TouchableOpacity
+                style={[styles.tab, activeTab === 'contacts' && styles.tabActive]}
+                onPress={() => setActiveTab('contacts')}
+              >
+                <Users size={16} color={activeTab === 'contacts' ? Colors.secondary : Colors.white} />
+                <Text
+                  style={[
+                    styles.tabText,
+                    activeTab === 'contacts' && styles.tabTextActive
+                  ]}
+                >
+                  Contacts ({contacts.length})
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.tab, activeTab === 'qr' && styles.tabActive]}
+                onPress={() => setActiveTab('qr')}
+              >
+                <QrCode size={16} color={activeTab === 'qr' ? Colors.secondary : Colors.white} />
+                <Text
+                  style={[
+                    styles.tabText,
+                    activeTab === 'qr' && styles.tabTextActive
+                  ]}
+                >
+                  QR Code
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </LinearGradient>
+      </Modal>
+      </ImageBackground>
+
+      <View style={styles.contentContainer}>
+        {activeTab === 'contacts' ? renderContactsTab() : renderQRTab()}
         </View>
       </View>
-
-      {activeTab === 'contacts' ? renderContactsTab() : renderQRTab()}
     </SafeAreaView>
   );
 }
@@ -330,36 +356,66 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.surface,
   },
+  headerBackground: {
+    minHeight: 160,
+  },
+  headerBackgroundImage: {
+    resizeMode: 'cover',
+  },
+  headerGradient: {
+    flex: 1,
+    paddingTop: Spacing.md,
+  },
   header: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  contentContainer: {
     backgroundColor: Colors.white,
-    paddingBottom: Spacing.md,
-    shadowColor: Colors.black,
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    flex: 1,
+    ...Shadows.small,
   },
   headerTop: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.lg,
+  },
+  headerContent: {
+    flex: 1,
+  },
+  titleContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.md,
+    gap: Spacing.sm,
+    marginBottom: Spacing.xs,
   },
   title: {
-    ...Typography.h1,
-    color: Colors.text,
+    ...Typography.h2,
+    color: Colors.white,
+    fontWeight: '700',
+  },
+  subtitle: {
+    ...Typography.body,
+    color: 'rgba(255, 255, 255, 0.9)',
   },
   logoutButton: {
-    marginLeft: 'auto',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: 44,
+    height: 44,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.small,
   },
   tabSelector: {
     flexDirection: 'row',
-    marginHorizontal: Spacing.md,
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.md,
+    marginHorizontal: Spacing.lg,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: BorderRadius.full,
     padding: 4,
+    gap: 4,
   },
   tab: {
     flex: 1,
@@ -368,19 +424,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
-    borderRadius: BorderRadius.sm,
+    borderRadius: BorderRadius.full,
     gap: Spacing.xs,
   },
   tabActive: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.white,
   },
   tabText: {
-    ...Typography.bodySmall,
-    color: Colors.textSecondary,
+    ...Typography.captionMedium,
+    color: Colors.white,
     fontWeight: '500',
   },
   tabTextActive: {
-    color: Colors.white,
+    color: Colors.secondary,
   },
   tabContent: {
     flex: 1,
@@ -395,7 +451,9 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
     borderRadius: BorderRadius.md,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
@@ -407,7 +465,9 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   addButton: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
     width: 44,
     height: 44,
     borderRadius: BorderRadius.md,
@@ -445,14 +505,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderRadius: BorderRadius.lg,
     padding: Spacing.lg,
-    shadowColor: Colors.black,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
   },
   qrHeader: {
     flexDirection: 'row',
@@ -460,29 +512,40 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     marginBottom: Spacing.sm,
   },
+  qrIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   qrTitle: {
-    ...Typography.h3,
+    ...Typography.h4,
     color: Colors.text,
+    fontWeight: '600',
   },
   qrDescription: {
-    ...Typography.bodySmall,
+    ...Typography.body,
     color: Colors.textSecondary,
     lineHeight: 20,
     marginBottom: Spacing.lg,
   },
   generateQRButton: {
-    backgroundColor: Colors.primary,
+    background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+    backgroundColor: Colors.primary, // fallback
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.md,
     gap: Spacing.sm,
+    ...Shadows.small,
   },
   generateQRText: {
-    ...Typography.body,
+    ...Typography.bodyMedium,
     color: Colors.white,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   scanQRButton: {
     backgroundColor: Colors.secondary,
@@ -492,29 +555,23 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.md,
     gap: Spacing.sm,
+    ...Shadows.small,
   },
   scanQRText: {
-    ...Typography.body,
+    ...Typography.bodyMedium,
     color: Colors.white,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   qrInfo: {
     backgroundColor: Colors.white,
     margin: Spacing.md,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
-    shadowColor: Colors.black,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
   },
   qrInfoTitle: {
-    ...Typography.h3,
+    ...Typography.h4,
     color: Colors.text,
+    fontWeight: '600',
     marginBottom: Spacing.md,
   },
   qrInfoSteps: {
@@ -528,18 +585,18 @@ const styles = StyleSheet.create({
   stepNumber: {
     width: 24,
     height: 24,
-    borderRadius: 12,
+    borderRadius: BorderRadius.full,
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   stepNumberText: {
-    ...Typography.bodySmall,
+    ...Typography.captionMedium,
     color: Colors.white,
     fontWeight: '600',
   },
   stepText: {
-    ...Typography.bodySmall,
+    ...Typography.body,
     color: Colors.textSecondary,
     flex: 1,
   },
@@ -551,14 +608,16 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     alignItems: 'center',
     width: 300,
+    ...Shadows.xl,
   },
   modalTitle: {
-    ...Typography.h2,
+    ...Typography.h3,
     color: Colors.primary,
+    fontWeight: '600',
     marginBottom: Spacing.md,
   },
   qrCodeContainer: {
@@ -569,13 +628,14 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.full,
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.xl,
     alignItems: 'center',
+    ...Shadows.small,
   },
   closeButtonText: {
-    ...Typography.body,
+    ...Typography.bodyMedium,
     color: Colors.white,
     fontWeight: '600',
   },

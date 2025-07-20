@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ImageBackground } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Search, Plus, Filter, RefreshCw } from 'lucide-react-native';
+import { Search, Plus, Filter, RefreshCw, Sparkles, TrendingUp, Calendar as CalendarIcon } from 'lucide-react-native';
 import { router } from 'expo-router';
 import EventCard from '@/components/EventCard';
 import LogoutButton from '@/components/LogoutButton';
 import { mockEvents, mockUser } from '@/data/mockData';
-import { Colors, Spacing, BorderRadius, Typography } from '@/constants/Colors';
+import { Colors, Spacing, BorderRadius, Typography, Shadows } from '@/constants/Colors';
 import { Event, User } from '@/types';
 import { useAuth } from '../../contexts/AuthContext';
 import { DatabaseService } from '../../services/database';
 import { useFocusEffect } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -30,10 +31,12 @@ export default function HomeScreen() {
 
   const categories = [
     { id: 'all', label: 'All Events' },
-    { id: 'conference', label: 'Conferences' },
-    { id: 'workshop', label: 'Workshops' },
-    { id: 'networking', label: 'Networking' },
-    { id: 'seminar', label: 'Seminars' },
+    { id: 'conference', label: 'Conferences', icon: '🎯' },
+    { id: 'workshop', label: 'Workshops', icon: '🛠️' },
+    { id: 'networking', label: 'Networking', icon: '🤝' },
+    { id: 'seminar', label: 'Seminars', icon: '📚' },
+    { id: 'meetup', label: 'Meetups', icon: '☕' },
+    { id: 'hackathon', label: 'Hackathons', icon: '💻' },
   ];
 
   useEffect(() => {
@@ -150,46 +153,74 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View>
-            <Text style={styles.greeting}>Welcome, {currentUser.name}!</Text>
-            <Text style={styles.subtitle}>Discover amazing events</Text>
-            {session && (
-              <Text style={styles.userInfo}>
-                Logged in as: {currentUser.email} ({currentUser.role})
-              </Text>
+      <ImageBackground
+        source={{ uri: 'https://images.pexels.com/photos/2774556/pexels-photo-2774556.jpeg?auto=compress&cs=tinysrgb&w=1200' }}
+        style={styles.headerBackground}
+        imageStyle={styles.headerBackgroundImage}
+      >
+        <LinearGradient
+          colors={['rgba(99, 102, 241, 0.8)', 'rgba(139, 92, 246, 0.9)']}
+          style={styles.headerGradient}
+        >
+          <View style={styles.header}>
+            <View style={styles.headerTop}>
+              <View style={styles.headerContent}>
+                <View style={styles.greetingContainer}>
+                  <Sparkles size={20} color={Colors.white} />
+                  <Text style={styles.greeting}>Welcome, {currentUser.name}!</Text>
+                </View>
+                <Text style={styles.subtitle}>Discover amazing events around you</Text>
+                {session && (
+                  <View style={styles.userInfoContainer}>
+                    <View style={styles.userInfoBadge}>
+                      <Text style={styles.userInfo}>
+                        {currentUser.email} • {currentUser.role}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+              <View style={styles.headerActions}>
+                {isOrganizer && (
+                  <TouchableOpacity style={styles.createButton} onPress={handleCreateEvent}>
+                    <Plus size={20} color={Colors.white} />
+                  </TouchableOpacity>
+                )}
+                <LogoutButton 
+                  size={20} 
+                  color={Colors.white}
+                  style={styles.logoutButton}
+                />
+              </View>
+            </View>
+            
+            {isAttendee && (
+              <View style={styles.tabContainer}>
+                <TouchableOpacity
+                  style={[styles.tabButton, !showMyEvents && styles.tabButtonActive]}
+                  onPress={() => setShowMyEvents(false)}
+                >
+                  <TrendingUp size={16} color={!showMyEvents ? Colors.primary : Colors.white} />
+                  <Text style={[styles.tabButtonText, !showMyEvents && styles.tabButtonTextActive]}>
+                    All Events
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.tabButton, showMyEvents && styles.tabButtonActive]}
+                  onPress={() => setShowMyEvents(true)}
+                >
+                  <CalendarIcon size={16} color={showMyEvents ? Colors.primary : Colors.white} />
+                  <Text style={[styles.tabButtonText, showMyEvents && styles.tabButtonTextActive]}>
+                    My Events
+                  </Text>
+                </TouchableOpacity>
+              </View>
             )}
           </View>
-          <View style={styles.headerActions}>
-            {isOrganizer && (
-              <TouchableOpacity style={styles.createButton} onPress={handleCreateEvent}>
-                <Plus size={20} color={Colors.white} />
-              </TouchableOpacity>
-            )}
-            <LogoutButton 
-              size={20} 
-              color={Colors.textSecondary}
-              style={styles.logoutButton}
-            />
-          </View>
-        </View>
-        {isAttendee && (
-          <View style={{ flexDirection: 'row', marginTop: 8, marginLeft: 8 }}>
-            <TouchableOpacity
-              style={[styles.tabButton, !showMyEvents && styles.tabButtonActive]}
-              onPress={() => setShowMyEvents(false)}
-            >
-              <Text style={[styles.tabButtonText, !showMyEvents && styles.tabButtonTextActive]}>All Events</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tabButton, showMyEvents && styles.tabButtonActive]}
-              onPress={() => setShowMyEvents(true)}
-            >
-              <Text style={[styles.tabButtonText, showMyEvents && styles.tabButtonTextActive]}>My Events</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        </LinearGradient>
+      </ImageBackground>
+
+      <View style={styles.searchSection}>
         <View style={styles.searchContainer}>
           <View style={styles.searchInputContainer}>
             <Search size={20} color={Colors.textSecondary} />
@@ -201,7 +232,7 @@ export default function HomeScreen() {
               placeholderTextColor={Colors.textLight}
             />
           </View>
-          <TouchableOpacity style={styles.filterButton}>
+          <TouchableOpacity style={[styles.filterButton, Shadows.small]}>
             <Filter size={20} color={Colors.primary} />
           </TouchableOpacity>
         </View>
@@ -221,6 +252,9 @@ export default function HomeScreen() {
               ]}
               onPress={() => setSelectedCategory(category.id)}
             >
+              {category.icon && (
+                <Text style={styles.categoryIcon}>{category.icon}</Text>
+              )}
               <Text
                 style={[
                   styles.categoryText,
@@ -232,6 +266,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
           ))}
         </ScrollView>
+      </View>
       </View>
 
       <ScrollView 
@@ -278,42 +313,86 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.surface,
   },
+  headerBackground: {
+    minHeight: 200,
+  },
+  headerBackgroundImage: {
+    resizeMode: 'cover',
+  },
+  headerGradient: {
+    flex: 1,
+    paddingTop: Spacing.md,
+  },
   header: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  searchSection: {
     backgroundColor: Colors.white,
-    paddingBottom: Spacing.md,
-    shadowColor: Colors.black,
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    paddingVertical: Spacing.md,
+    ...Shadows.small,
   },
   headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.md,
-    marginBottom: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.lg,
+  },
+  headerContent: {
+    flex: 1,
+  },
+  greetingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginBottom: Spacing.xs,
   },
   greeting: {
-    ...Typography.h2,
-    color: Colors.text,
+    ...Typography.h3,
+    color: Colors.white,
+    fontWeight: '700',
   },
   subtitle: {
-    ...Typography.bodySmall,
-    color: Colors.textSecondary,
-    marginTop: 2,
+    ...Typography.body,
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginBottom: Spacing.sm,
+  },
+  userInfoContainer: {
+    marginTop: Spacing.xs,
+  },
+  userInfoBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.full,
+    alignSelf: 'flex-start',
+  },
+  userInfo: {
+    ...Typography.captionMedium,
+    color: Colors.white,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    marginHorizontal: Spacing.lg,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: BorderRadius.full,
+    padding: 4,
+    gap: 4,
   },
   createButton: {
-    backgroundColor: Colors.primary,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     width: 44,
     height: 44,
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+    ...Shadows.small,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -325,7 +404,9 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.border,
     borderRadius: BorderRadius.md,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
@@ -337,7 +418,9 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   filterButton: {
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.border,
     width: 44,
     height: 44,
     borderRadius: BorderRadius.md,
@@ -351,22 +434,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     gap: Spacing.sm,
   },
+  categoryIcon: {
+    fontSize: 16,
+  },
   categoryChip: {
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.white,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.xl,
+    borderRadius: BorderRadius.full,
     borderWidth: 1,
     borderColor: Colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    ...Shadows.small,
   },
   categoryChipActive: {
     backgroundColor: Colors.primary,
     borderColor: Colors.primary,
   },
   categoryText: {
-    ...Typography.bodySmall,
+    ...Typography.captionMedium,
     color: Colors.textSecondary,
-    fontWeight: '500',
   },
   categoryTextActive: {
     color: Colors.white,
@@ -393,37 +482,31 @@ const styles = StyleSheet.create({
     color: Colors.textLight,
     textAlign: 'center',
   },
-  userInfo: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    marginTop: 4,
-    fontStyle: 'italic',
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-  },
   logoutButton: {
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     width: 44,
     height: 44,
     borderRadius: BorderRadius.md,
     alignItems: 'center',
     justifyContent: 'center',
+    ...Shadows.small,
   },
   tabButton: {
-    padding: Spacing.sm,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: BorderRadius.md,
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.full,
+    gap: Spacing.xs,
   },
   tabButtonActive: {
-    borderColor: Colors.primary,
+    backgroundColor: Colors.white,
   },
   tabButtonText: {
-    ...Typography.bodySmall,
-    color: Colors.textSecondary,
+    ...Typography.captionMedium,
+    color: Colors.white,
   },
   tabButtonTextActive: {
     color: Colors.primary,

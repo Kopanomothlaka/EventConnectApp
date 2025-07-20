@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Building, MapPin, MessageCircle, Linkedin } from 'lucide-react-native';
+import { Building, MapPin, MessageCircle, Linkedin, Star, CheckCircle } from 'lucide-react-native';
 import { Contact } from '@/types';
-import { Colors, Spacing, BorderRadius, Typography } from '@/constants/Colors';
+import { Colors, Spacing, BorderRadius, Typography, Shadows } from '@/constants/Colors';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface ContactCardProps {
   contact: Contact;
@@ -29,11 +30,14 @@ export default function ContactCard({ contact, onPress, isMutual }: ContactCardP
   };
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity style={[styles.card, Shadows.medium]} onPress={onPress} activeOpacity={0.95}>
       <View style={styles.header}>
-        <View style={styles.avatarContainer}>
+        <LinearGradient
+          colors={[Colors.primaryLight, Colors.primary]}
+          style={styles.avatarContainer}
+        >
           <Text style={styles.avatarText}>{getInitials(contact.name)}</Text>
-        </View>
+        </LinearGradient>
         <View style={styles.headerContent}>
           <Text style={styles.name} numberOfLines={1}>
             {contact.name}
@@ -42,20 +46,23 @@ export default function ContactCard({ contact, onPress, isMutual }: ContactCardP
             {contact.email}
           </Text>
           {isMutual && (
-            <View style={styles.connectedBadge}>
-              <Text style={styles.connectedBadgeText}>Connected</Text>
+            <View style={[styles.connectedBadge, Shadows.small]}>
+              <CheckCircle size={12} color={Colors.white} />
+              <Text style={styles.connectedBadgeText}>
+                Connected
+              </Text>
             </View>
           )}
         </View>
         <View style={styles.socialIcons}>
           {contact.linkedIn && (
             <TouchableOpacity style={styles.socialButton}>
-              <Linkedin size={16} color={Colors.primary} />
+              <Linkedin size={16} color={Colors.info} />
             </TouchableOpacity>
           )}
           {contact.whatsApp && (
             <TouchableOpacity style={styles.socialButton}>
-              <MessageCircle size={16} color={Colors.accent} />
+              <MessageCircle size={16} color={Colors.success} />
             </TouchableOpacity>
           )}
         </View>
@@ -73,8 +80,12 @@ export default function ContactCard({ contact, onPress, isMutual }: ContactCardP
 
       <View style={styles.footer}>
         <View style={styles.metAtContainer}>
-          <MapPin size={12} color={Colors.textLight} />
-          <Text style={styles.metAtText}>Met at {contact.metAt}</Text>
+          <View style={styles.metAtIcon}>
+            <Star size={10} color={Colors.warning} fill={Colors.warning} />
+          </View>
+          <Text style={styles.metAtText}>
+            Met at {contact.metAt}
+          </Text>
         </View>
         <Text style={styles.dateText}>{formatDate(contact.dateAdded)}</Text>
       </View>
@@ -93,18 +104,10 @@ export default function ContactCard({ contact, onPress, isMutual }: ContactCardP
 const styles = StyleSheet.create({
   card: {
     backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.xl,
     padding: Spacing.md,
     marginHorizontal: Spacing.md,
     marginVertical: Spacing.sm,
-    shadowColor: Colors.black,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
   },
   header: {
     flexDirection: 'row',
@@ -112,16 +115,15 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   avatarContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: Colors.primaryLight,
+    width: 52,
+    height: 52,
+    borderRadius: BorderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: Spacing.md,
   },
   avatarText: {
-    ...Typography.body,
+    ...Typography.bodyMedium,
     color: Colors.primary,
     fontWeight: '600',
   },
@@ -129,9 +131,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   name: {
-    ...Typography.body,
+    ...Typography.bodyMedium,
     color: Colors.text,
-    fontWeight: '500',
+    fontWeight: '600',
     marginBottom: 2,
   },
   email: {
@@ -143,12 +145,13 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
   },
   socialButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: BorderRadius.full,
     backgroundColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
+    ...Shadows.small,
   },
   detailRow: {
     flexDirection: 'row',
@@ -157,7 +160,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   detailText: {
-    ...Typography.bodySmall,
+    ...Typography.body,
     color: Colors.textSecondary,
     flex: 1,
   },
@@ -172,13 +175,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.xs,
   },
+  metAtIcon: {
+    width: 16,
+    height: 16,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.warningLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   metAtText: {
-    ...Typography.caption,
+    ...Typography.captionMedium,
     color: Colors.textLight,
-    fontStyle: 'italic',
   },
   dateText: {
-    ...Typography.caption,
+    ...Typography.captionMedium,
     color: Colors.textLight,
   },
   notesContainer: {
@@ -188,22 +198,24 @@ const styles = StyleSheet.create({
     borderTopColor: Colors.borderLight,
   },
   notesText: {
-    ...Typography.bodySmall,
+    ...Typography.body,
     color: Colors.textSecondary,
     fontStyle: 'italic',
   },
   connectedBadge: {
-    backgroundColor: '#22c55e', // green
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    backgroundColor: Colors.success,
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
     alignSelf: 'flex-start',
-    marginTop: 4,
-    marginBottom: 2,
+    marginTop: Spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   connectedBadgeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
+    ...Typography.captionMedium,
+    color: Colors.white,
+    fontWeight: '600',
   },
 });

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { MapPin, Clock, Users, Calendar, Edit3, X, Check as Checkmark, Circle } from 'lucide-react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ImageBackground } from 'react-native';
+import { MapPin, Clock, Users, Calendar, Check as Checkmark, Circle, Star, Bookmark } from 'lucide-react-native';
 import { Event } from '@/types';
-import { Colors, Spacing, BorderRadius, Typography } from '@/constants/Colors';
+import { Colors, Spacing, BorderRadius, Typography, Shadows } from '@/constants/Colors';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface EventCardProps {
   event: Event;
@@ -15,9 +16,22 @@ interface EventCardProps {
   onDelete?: (eventId: string) => void;
 }
 
+const getCategoryImage = (category: string) => {
+  const images = {
+    conference: 'https://images.pexels.com/photos/2774556/pexels-photo-2774556.jpeg?auto=compress&cs=tinysrgb&w=800',
+    workshop: 'https://images.pexels.com/photos/3184465/pexels-photo-3184465.jpeg?auto=compress&cs=tinysrgb&w=800',
+    networking: 'https://images.pexels.com/photos/1181406/pexels-photo-1181406.jpeg?auto=compress&cs=tinysrgb&w=800',
+    seminar: 'https://images.pexels.com/photos/2608517/pexels-photo-2608517.jpeg?auto=compress&cs=tinysrgb&w=800',
+    meetup: 'https://images.pexels.com/photos/3184339/pexels-photo-3184339.jpeg?auto=compress&cs=tinysrgb&w=800',
+    hackathon: 'https://images.pexels.com/photos/3861969/pexels-photo-3861969.jpeg?auto=compress&cs=tinysrgb&w=800',
+  };
+  return images[category as keyof typeof images] || images.conference;
+};
+
 export default function EventCard({ event, onPress, onRegister, onUnregister, isRegistered: isRegisteredProp, currentUserId, onEdit, onDelete }: EventCardProps) {
   const [isRegistering, setIsRegistering] = useState(false);
   const [isRegistered, setIsRegistered] = useState(isRegisteredProp ?? event.isRegistered);
+  const [isBookmarked, setIsBookmarked] = useState(false);
   const isOwnEvent = currentUserId && event.organizer && currentUserId === event.organizer.id;
 
   const formatDate = (date: string) => {
@@ -36,141 +50,142 @@ export default function EventCard({ event, onPress, onRegister, onUnregister, is
   };
 
   const getCategoryColor = (category: string) => {
-    switch (category) {
-      case 'conference':
-        return Colors.primary;
-      case 'workshop':
-        return Colors.secondary;
-      case 'networking':
-        return Colors.accent;
-      case 'seminar':
-        return Colors.warning;
-      default:
-        return Colors.primary;
-    }
+    const colors = {
+      conference: Colors.conference,
+      workshop: Colors.workshop,
+      networking: Colors.networking,
+      seminar: Colors.seminar,
+      meetup: Colors.meetup,
+      hackathon: Colors.hackathon,
+    };
+    return colors[category as keyof typeof colors] || Colors.primary;
   };
 
-  const handleRegister = async () => {
-    if (event.maxAttendees && event.attendees.length >= event.maxAttendees) {
-      Alert.alert('Event Full', 'This event has reached its maximum capacity.');
-      return;
-    }
-
-    setIsRegistering(true);
-    
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setIsRegistered(true);
-      onRegister?.(event.id);
-      Alert.alert('Success', 'You have successfully registered for this event!');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to register for event. Please try again.');
-    } finally {
-      setIsRegistering(false);
-    }
+  const handleBookmark = () => {
+    setIsBookmarked(!isBookmarked);
   };
 
-  const handleUnregister = async () => {
-    Alert.alert(
-      'Unregister',
-      'Are you sure you want to unregister from this event?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Unregister',
-          style: 'destructive',
-          onPress: async () => {
-            setIsRegistering(true);
-            
-            try {
-              // Simulate API call
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              
-              setIsRegistered(false);
-              onUnregister?.(event.id);
-              Alert.alert('Success', 'You have been unregistered from this event.');
-            } catch (error) {
-              Alert.alert('Error', 'Failed to unregister from event. Please try again.');
-            } finally {
-              setIsRegistering(false);
-            }
-          }
-        }
-      ]
-    );
+  const attendancePercentage = event.maxAttendees 
+    ? (event.attendees.length / event.maxAttendees) * 100 
+    : 0;
+
+  const getAttendanceStatus = () => {
+    if (attendancePercentage >= 90) return { color: Colors.error, text: 'Almost Full' };
+    if (attendancePercentage >= 70) return { color: Colors.warning, text: 'Filling Up' };
+    return { color: Colors.success, text: 'Available' };
   };
+
+  const attendanceStatus = getAttendanceStatus();
 
   return (
     <TouchableOpacity
-      style={styles.card}
+      style={[styles.card, Shadows.medium]}
       onPress={onPress}
-      activeOpacity={0.7}
+      activeOpacity={0.95}
     >
-      <View style={styles.header}>
-        <View style={styles.dateContainer}>
-          <Calendar size={16} color={Colors.primary} />
-          <Text style={styles.dateText}>{formatDate(event.date)}</Text>
-        </View>
-        <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor(event.category) }]}>
-          <Text style={styles.categoryText}>{event.category}</Text>
-        </View>
-      </View>
+      <ImageBackground
+        source={{ uri: getCategoryImage(event.category) }}
+        style={styles.imageBackground}
+        imageStyle={styles.backgroundImage}
+      >
+        <LinearGradient
+          colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.7)']}
+          style={styles.gradient}
+        >
+          <View style={styles.header}>
+            <View style={styles.dateContainer}>
+              <Calendar size={14} color={Colors.white} />
+              <Text style={styles.dateText}>{formatDate(event.date)}</Text>
+            </View>
+            <View style={styles.headerActions}>
+              <TouchableOpacity 
+                style={[styles.iconButton, { backgroundColor: isBookmarked ? Colors.warning : 'rgba(255,255,255,0.2)' }]}
+                onPress={handleBookmark}
+              >
+                <Bookmark size={16} color={Colors.white} fill={isBookmarked ? Colors.white : 'transparent'} />
+              </TouchableOpacity>
+              <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor(event.category) }]}>
+                <Text style={styles.categoryText}>{event.category}</Text>
+              </View>
+            </View>
+          </View>
 
-      <Text style={styles.title} numberOfLines={2}>
-        {event.title}
-      </Text>
+          <View style={styles.content}>
+            <Text style={styles.title} numberOfLines={2}>
+              {event.title}
+            </Text>
+            
+            {event.maxAttendees && (
+              <View style={styles.attendanceContainer}>
+                <View style={[styles.attendanceBadge, { backgroundColor: attendanceStatus.color }]}>
+                  <Text style={styles.attendanceText}>{attendanceStatus.text}</Text>
+                </View>
+              </View>
+            )}
+          </View>
+        </LinearGradient>
+      </ImageBackground>
 
-      <Text style={styles.description} numberOfLines={2}>
-        {event.description}
-      </Text>
+      <View style={styles.cardContent}>
+        <Text style={styles.description} numberOfLines={2}>
+          {event.description}
+        </Text>
 
-      <View style={styles.details}>
-        <View style={styles.detailRow}>
-          <Clock size={14} color={Colors.textSecondary} />
-          <Text style={styles.detailText}>{formatTime(event.time)}</Text>
+        <View style={styles.details}>
+          <View style={styles.detailRow}>
+            <Clock size={16} color={Colors.primary} />
+            <Text style={styles.detailText}>{formatTime(event.time)}</Text>
+          </View>
+          <View style={styles.detailRow}>
+            <MapPin size={16} color={Colors.primary} />
+            <Text style={styles.detailText} numberOfLines={1}>
+              {event.venue}
+            </Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Users size={16} color={Colors.primary} />
+            <Text style={styles.detailText}>
+              {event.attendees.length}
+              {event.maxAttendees ? `/${event.maxAttendees}` : ''} attending
+            </Text>
+          </View>
         </View>
-        <View style={styles.detailRow}>
-          <MapPin size={14} color={Colors.textSecondary} />
-          <Text style={styles.detailText} numberOfLines={1}>
-            {event.venue}
-          </Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Users size={14} color={Colors.textSecondary} />
-          <Text style={styles.detailText}>
-            {event.attendees.length}
-            {event.maxAttendees ? `/${event.maxAttendees}` : ''} attending
-          </Text>
-        </View>
-      </View>
 
-      <View style={styles.footer}>
-        <Text style={styles.organizerText}>by {event.organizer.name}</Text>
-        {isOwnEvent && (
-          <View style={styles.attendeeCountBadge}>
-            <Users size={14} color={Colors.secondary} />
-            <Text style={styles.attendeeCountText}>{event.attendees.length} attendee{event.attendees.length === 1 ? '' : 's'}</Text>
+        <View style={styles.footer}>
+          <View style={styles.organizerContainer}>
+            <View style={styles.organizerAvatar}>
+              <Text style={styles.organizerInitial}>
+                {event.organizer.name.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+            <Text style={styles.organizerText}>by {event.organizer.name}</Text>
+          </View>
+          
+          {isOwnEvent && (
+            <View style={styles.attendeeCountBadge}>
+              <Star size={14} color={Colors.warning} fill={Colors.warning} />
+              <Text style={styles.attendeeCountText}>Your Event</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Registration status indicator */}
+        {!isOwnEvent && (
+          <View style={styles.registrationIndicator}>
+            {isRegistered ? (
+              <View style={styles.registeredBadge}>
+                <Checkmark size={16} color={Colors.white} />
+                <Text style={styles.registeredText}>Registered</Text>
+              </View>
+            ) : (
+              <View style={styles.unregisteredBadge}>
+                <Circle size={16} color={Colors.textLight} />
+                <Text style={styles.unregisteredText}>Not Registered</Text>
+              </View>
+            )}
           </View>
         )}
       </View>
-      {/* Registered icon for attendees at bottom right */}
-      {isRegistered && !isOwnEvent && (
-        <View style={styles.registeredIconContainer}>
-          <View style={styles.registeredIconBadge}>
-            <Checkmark size={18} color={Colors.white} />
-          </View>
-        </View>
-      )}
-      {/* Unregistered icon for attendees at bottom right */}
-      {!isRegistered && !isOwnEvent && (
-        <View style={styles.registeredIconContainer}>
-          <View style={styles.unregisteredIconBadge}>
-            <Circle size={18} color={Colors.textLight} />
-          </View>
-        </View>
-      )}
     </TouchableOpacity>
   );
 }
@@ -178,71 +193,105 @@ export default function EventCard({ event, onPress, onRegister, onUnregister, is
 const styles = StyleSheet.create({
   card: {
     backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
+    borderRadius: BorderRadius.xl,
     marginHorizontal: Spacing.md,
     marginVertical: Spacing.sm,
-    shadowColor: Colors.black,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    overflow: 'hidden',
   },
-  cardRegistered: {
-    backgroundColor: Colors.textLight,
+  imageBackground: {
+    height: 160,
+    width: '100%',
+  },
+  backgroundImage: {
+    borderTopLeftRadius: BorderRadius.xl,
+    borderTopRightRadius: BorderRadius.xl,
+  },
+  gradient: {
+    flex: 1,
+    padding: Spacing.md,
+    justifyContent: 'space-between',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
+    alignItems: 'flex-start',
   },
   dateContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.full,
     gap: Spacing.xs,
   },
   dateText: {
-    ...Typography.bodySmall,
-    color: Colors.primary,
-    fontWeight: '500',
+    ...Typography.captionMedium,
+    color: Colors.white,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: Spacing.xs,
+    alignItems: 'center',
+  },
+  iconButton: {
+    width: 32,
+    height: 32,
+    borderRadius: BorderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   categoryBadge: {
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.sm,
+    borderRadius: BorderRadius.full,
   },
   categoryText: {
-    ...Typography.caption,
+    ...Typography.captionMedium,
     color: Colors.white,
-    fontWeight: '500',
     textTransform: 'capitalize',
   },
+  content: {
+    gap: Spacing.sm,
+  },
   title: {
-    ...Typography.h3,
-    color: Colors.text,
-    marginBottom: Spacing.xs,
+    ...Typography.h4,
+    color: Colors.white,
+    fontWeight: '700',
+  },
+  attendanceContainer: {
+    alignSelf: 'flex-start',
+  },
+  attendanceBadge: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.sm,
+  },
+  attendanceText: {
+    ...Typography.caption,
+    color: Colors.white,
+    fontWeight: '600',
+  },
+  cardContent: {
+    padding: Spacing.md,
+    gap: Spacing.md,
   },
   description: {
     ...Typography.bodySmall,
     color: Colors.textSecondary,
-    marginBottom: Spacing.md,
+    lineHeight: 20,
   },
   details: {
-    gap: Spacing.xs,
-    marginBottom: Spacing.md,
+    gap: Spacing.sm,
   },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xs,
+    gap: Spacing.sm,
   },
   detailText: {
     ...Typography.bodySmall,
-    color: Colors.textSecondary,
+    color: Colors.text,
     flex: 1,
   },
   footer: {
@@ -250,106 +299,74 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  organizerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    flex: 1,
+  },
+  organizerAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  organizerInitial: {
+    ...Typography.caption,
+    color: Colors.primary,
+    fontWeight: '600',
+  },
   organizerText: {
     ...Typography.bodySmall,
     color: Colors.textLight,
     fontStyle: 'italic',
-  },
-  registerButton: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.sm,
-  },
-  registerButtonDisabled: {
-    backgroundColor: Colors.textLight,
-  },
-  registerButtonText: {
-    ...Typography.bodySmall,
-    color: Colors.white,
-    fontWeight: '500',
-  },
-  unregisterButton: {
-    backgroundColor: Colors.error,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.sm,
-  },
-  unregisterButtonText: {
-    ...Typography.bodySmall,
-    color: Colors.white,
-    fontWeight: '500',
-  },
-  registeredBadge: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.sm,
-    marginLeft: Spacing.xs,
-  },
-  registeredBadgeText: {
-    ...Typography.caption,
-    color: Colors.white,
-    fontWeight: '500',
-  },
-  iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 4,
+    flex: 1,
   },
   attendeeCountBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.warningLight,
     borderRadius: BorderRadius.sm,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 2,
-    marginTop: 4,
-    alignSelf: 'flex-start',
     gap: 4,
   },
   attendeeCountText: {
-    ...Typography.bodySmall,
-    color: Colors.secondary,
-    fontWeight: '500',
-    marginLeft: 4,
+    ...Typography.captionMedium,
+    color: Colors.warning,
   },
-  registeredIconContainer: {
-    position: 'absolute',
-    right: 16,
-    bottom: 16,
-    zIndex: 10,
+  registrationIndicator: {
+    alignSelf: 'flex-end',
+    marginTop: -Spacing.xs,
   },
-  registeredIconBadge: {
+  registeredBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: Colors.success,
-    borderRadius: 16,
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 4,
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    gap: 4,
   },
-  unregisteredIconBadge: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    width: 32,
-    height: 32,
+  registeredText: {
+    ...Typography.captionMedium,
+    color: Colors.white,
+  },
+  unregisteredBadge: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: Colors.textLight,
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.10,
-    shadowRadius: 2,
-    elevation: 2,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 4,
+  },
+  unregisteredText: {
+    ...Typography.captionMedium,
+    color: Colors.textLight,
   },
 });
